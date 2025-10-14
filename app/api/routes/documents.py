@@ -8,6 +8,7 @@ from app.models.document import Document, DocType, ProcessingStatus
 from app.api.schemas.document import DocumentResponse, JobStatusResponse
 from app.services.storage import StorageService
 import uuid
+from app.workers.tasks import process_document_task
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -36,6 +37,8 @@ async def upload_document(
     db.add(document)
     db.commit()
     db.refresh(document)
+    
+    process_document_task.delay(str(document.id))
     
     job_id = f"doc_{document.id}"
     
