@@ -12,4 +12,4 @@ class VectorChunk(Base):
     chunk_text = Column(Text, nullable=False)
     embedding = Column(Vector(1536))  # OpenAI embedding dimension
     chunk_index = Column(Integer, nullable=False)
-    metadata = Column(JSON, default={})
+    chunk_metadata = Column(JSON, default={})
