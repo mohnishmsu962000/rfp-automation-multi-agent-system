@@ -9,6 +9,7 @@ from app.api.schemas.document import DocumentResponse, JobStatusResponse
 from app.services.storage import StorageService
 import uuid
 from app.workers.tasks import process_document_task
+from app.agents.answer_generator import generate_answer_for_question
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -93,3 +94,12 @@ def delete_document(
     db.commit()
     
     return {"success": True, "message": "Document deleted"}
+
+
+@router.post("/test-answer")
+def test_answer_generation(
+    question: str,
+    db: Session = Depends(get_db)
+):
+    result = generate_answer_for_question(question, db)
+    return result
