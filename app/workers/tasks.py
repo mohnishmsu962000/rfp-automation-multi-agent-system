@@ -1,7 +1,7 @@
 from app.workers.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.document import Document, ProcessingStatus
-from app.models.document_chunk import DocumentChunk
+from app.models.vector_chunk import VectorChunk as DocumentChunk
 from app.models.attribute import Attribute
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
