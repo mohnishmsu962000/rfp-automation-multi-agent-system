@@ -33,3 +33,10 @@ class JobStatusResponse(BaseModel):
     progress: Optional[int] = None
     message: Optional[str] = None
     rfp_id: Optional[str] = None
+    
+    
+class QuestionUpdate(BaseModel):
+    answer_text: str
+    
+class RephraseRequest(BaseModel):
+    instruction: str

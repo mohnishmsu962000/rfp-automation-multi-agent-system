@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
@@ -8,6 +8,13 @@ from app.models.rfp_question import RFPQuestion
 from app.api.schemas.rfp import RFPProjectResponse, RFPQuestionResponse
 from app.services.storage import StorageService
 from app.workers.rfp_tasks import process_rfp_task
+from app.api.schemas.rfp import QuestionUpdate
+from datetime import datetime
+from uuid import UUID
+from app.services.llm_factory import LLMFactory
+from app.prompts.answer_generator import REPHRASE_ANSWER_SYSTEM, REPHRASE_ANSWER_USER
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.api.schemas.rfp import RephraseRequest
 
 router = APIRouter(prefix="/api/rfps", tags=["rfps"])
 
@@ -86,3 +93,95 @@ def delete_rfp(rfp_id: str, db: Session = Depends(get_db)):
     db.commit()
     
     return {"success": True, "message": "RFP deleted"}
+
+
+@router.patch("/{rfp_id}/questions/{question_id}", response_model=dict)
+def update_question_answer(
+    rfp_id: UUID,
+    question_id: UUID,
+    data: QuestionUpdate,
+    db: Session = Depends(get_db)
+):
+    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    
+    rfp = db.query(RFPProject).filter(
+        RFPProject.id == rfp_id,
+        RFPProject.user_id == HARDCODED_USER_ID
+    ).first()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP not found")
+    
+    question = db.query(RFPQuestion).filter(
+        RFPQuestion.id == question_id,
+        RFPQuestion.project_id == rfp_id
+    ).first()
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    question.answer_text = data.answer_text
+    question.user_edited = True
+    question.updated_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(question)
+    
+    return {
+        "success": True,
+        "message": "Answer updated successfully",
+        "question_id": str(question.id)
+    }
+    
+
+
+@router.post("/{rfp_id}/questions/{question_id}/rephrase", response_model=dict)
+def rephrase_answer(
+    rfp_id: UUID,
+    question_id: UUID,
+    data: RephraseRequest,
+    db: Session = Depends(get_db)
+):
+    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    
+    rfp = db.query(RFPProject).filter(
+        RFPProject.id == rfp_id,
+        RFPProject.user_id == HARDCODED_USER_ID
+    ).first()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP not found")
+    
+    question = db.query(RFPQuestion).filter(
+        RFPQuestion.id == question_id,
+        RFPQuestion.project_id == rfp_id
+    ).first()
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    sources_text = "No specific sources available for this answer."
+    if question.source_ids and len(question.source_ids) > 0:
+        sources_text = "\n".join([f"- Source {i+1}" for i in range(len(question.source_ids))])
+    
+    prompt = REPHRASE_ANSWER_USER.format(
+        question=question.question_text,
+        current_answer=question.answer_text,
+        sources=sources_text,
+        instruction=data.instruction
+    )
+    
+    llm = LLMFactory.get_llm("gemini-flash")
+    
+    response = llm.invoke([
+        SystemMessage(content=REPHRASE_ANSWER_SYSTEM),
+        HumanMessage(content=prompt)
+    ])
+    
+    return {
+        "success": True,
+        "original_answer": question.answer_text,
+        "rephrased_answer": response.content,
+        "instruction": data.instruction,
+        "note": "This is a preview. Use PATCH endpoint to save if you want to keep it."
+    }
