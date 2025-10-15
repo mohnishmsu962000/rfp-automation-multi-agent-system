@@ -1,0 +1,107 @@
+from sqlalchemy.orm import Session
+from app.models.document_quota import DocumentQuota
+from app.models.resync_quota import ResyncQuota
+from app.models.rfp_project import RFPProject
+from datetime import datetime
+from uuid import UUID
+
+RATE_LIMITS = {
+    "documents": 100,
+    "rfps": 20,
+    "rephrase": 1000,
+    "resync": 2
+}
+
+class RateLimiter:
+    
+    @staticmethod
+    def check_document_quota(user_id: UUID, db: Session) -> tuple[bool, int, int]:
+        quota = db.query(DocumentQuota).filter(
+            DocumentQuota.user_id == user_id
+        ).first()
+        
+        current_count = quota.document_count if quota else 0
+        remaining = RATE_LIMITS["documents"] - current_count
+        
+        if current_count >= RATE_LIMITS["documents"]:
+            return False, current_count, remaining
+        
+        return True, current_count, remaining
+    
+    @staticmethod
+    def increment_document_quota(user_id: UUID, db: Session):
+        quota = db.query(DocumentQuota).filter(
+            DocumentQuota.user_id == user_id
+        ).first()
+        
+        if quota:
+            quota.document_count += 1
+            quota.updated_at = datetime.utcnow()
+        else:
+            quota = DocumentQuota(
+                user_id=user_id,
+                document_count=1
+            )
+            db.add(quota)
+        
+        db.commit()
+    
+    @staticmethod
+    def check_rfp_quota(user_id: UUID, db: Session) -> tuple[bool, int, int]:
+        month_year = datetime.utcnow().strftime("%Y-%m")
+        
+        count = db.query(RFPProject).filter(
+            RFPProject.user_id == user_id,
+            RFPProject.created_at >= datetime.strptime(month_year, "%Y-%m")
+        ).count()
+        
+        remaining = RATE_LIMITS["rfps"] - count
+        
+        if count >= RATE_LIMITS["rfps"]:
+            return False, count, remaining
+        
+        return True, count, remaining
+    
+    @staticmethod
+    def get_usage_stats(user_id: UUID, db: Session) -> dict:
+        doc_quota = db.query(DocumentQuota).filter(
+            DocumentQuota.user_id == user_id
+        ).first()
+        
+        docs_used = doc_quota.document_count if doc_quota else 0
+        
+        month_year = datetime.utcnow().strftime("%Y-%m")
+        rfps_used = db.query(RFPProject).filter(
+            RFPProject.user_id == user_id,
+            RFPProject.created_at >= datetime.strptime(month_year, "%Y-%m")
+        ).count()
+        
+        resync_quota = db.query(ResyncQuota).filter(
+            ResyncQuota.user_id == user_id,
+            ResyncQuota.month_year == month_year
+        ).first()
+        
+        resyncs_used = resync_quota.resync_count if resync_quota else 0
+        
+        return {
+            "documents": {
+                "used": docs_used,
+                "limit": RATE_LIMITS["documents"],
+                "remaining": RATE_LIMITS["documents"] - docs_used
+            },
+            "rfps": {
+                "used": rfps_used,
+                "limit": RATE_LIMITS["rfps"],
+                "remaining": RATE_LIMITS["rfps"] - rfps_used
+            },
+            "rephrase": {
+                "used": 0,
+                "limit": RATE_LIMITS["rephrase"],
+                "remaining": RATE_LIMITS["rephrase"]
+            },
+            "resync": {
+                "used": resyncs_used,
+                "limit": RATE_LIMITS["resync"],
+                "remaining": RATE_LIMITS["resync"] - resyncs_used
+            }
+        }

@@ -18,37 +18,46 @@ from app.api.schemas.rfp import RephraseRequest
 from fastapi.responses import StreamingResponse
 from app.services.export_service import ExportService
 import io
+from app.services.rate_limiter import RateLimiter
 
 router = APIRouter(prefix="/api/rfps", tags=["rfps"])
 
-@router.post("/")
+@router.post("/", response_model=dict)
 async def upload_rfp(
     file: UploadFile = File(...),
     rfp_name: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    
+    allowed, used, remaining = RateLimiter.check_rfp_quota(HARDCODED_USER_ID, db)
+    
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Monthly RFP limit reached. You have created {used}/20 RFPs this month."
+        )
+    
     file_content = await file.read()
     file_url = StorageService.upload_file(file_content, file.filename, bucket="rfps")
     
-    user_id = "550e8400-e29b-41d4-a716-446655440000"
-    
-    rfp_project = RFPProject(
-        user_id=user_id,
+    rfp = RFPProject(
+        user_id=HARDCODED_USER_ID,
         rfp_name=rfp_name,
         rfp_file_url=file_url,
         status=RFPStatus.PENDING
     )
     
-    db.add(rfp_project)
+    db.add(rfp)
     db.commit()
-    db.refresh(rfp_project)
+    db.refresh(rfp)
     
-    process_rfp_task.delay(str(rfp_project.id))
+    process_rfp_task.delay(str(rfp.id))
     
     return {
         "success": True,
-        "message": "RFP processing started",
-        "job_id": f"rfp_{rfp_project.id}"
+        "message": f"RFP processing started. {remaining - 1} RFPs remaining this month.",
+        "job_id": f"rfp_{rfp.id}"
     }
 
 @router.get("/", response_model=List[RFPProjectResponse])
