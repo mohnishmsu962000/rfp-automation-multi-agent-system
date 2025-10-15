@@ -6,14 +6,14 @@ def search_attributes(state: AnswerGeneratorState) -> AnswerGeneratorState:
     db = SessionLocal()
     
     try:
-        user_id = state.get("user_id")
-        if not user_id:
+        company_id = state.get("company_id")
+        if not company_id:
             state["attribute_results"] = []
             return state
         
         query = state["question"]
         
-        results = AttributeSearchService.search_attributes(query, user_id, db, top_k=3)
+        results = AttributeSearchService.search_attributes(query, company_id, db, top_k=3)
         
         print(f"Attribute search for: {query}")
         print(f"Top result: {results[0] if results else 'None'}")

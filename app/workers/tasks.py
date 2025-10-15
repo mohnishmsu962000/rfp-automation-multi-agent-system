@@ -1,24 +1,21 @@
 from app.workers.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.document import Document, ProcessingStatus
-from app.models.vector_chunk import VectorChunk
+from app.models.document_chunk import DocumentChunk
+from app.models.attribute import Attribute
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
-from app.services.storage import StorageService
-from app.services.attribute_extractor import AttributeExtractor
-from app.agents.kb_manager import run_kb_manager
+from app.agents.attribute_extractor import AttributeExtractor
 import httpx
 import tempfile
 import os
-from app.workers.rfp_tasks import process_rfp_task
-from app.workers.attribute_tasks import resync_attributes_task
 
 @celery_app.task(name="process_document")
-def process_document_task(doc_id: str):
+def process_document_task(document_id: str):
     db = SessionLocal()
     
     try:
-        document = db.query(Document).filter(Document.id == doc_id).first()
+        document = db.query(Document).filter(Document.id == document_id).first()
         if not document:
             return {"error": "Document not found"}
         
@@ -31,47 +28,51 @@ def process_document_task(doc_id: str):
             tmp_file.write(response.content)
             tmp_path = tmp_file.name
         
-        text = DocumentProcessor.extract_text(tmp_path, document.filename)
+        text_content = DocumentProcessor.extract_text(tmp_path, document.filename)
         os.unlink(tmp_path)
         
-        chunks = DocumentProcessor.chunk_text(text)
+        chunks = DocumentProcessor.chunk_text(text_content)
         
         chunk_texts = [chunk["text"] for chunk in chunks]
         embeddings = EmbeddingService.generate_embeddings(chunk_texts)
         
-        for chunk, embedding in zip(chunks, embeddings):
-            vector_chunk = VectorChunk(
-                doc_id=document.id,
-                chunk_text=chunk["text"],
-                embedding=embedding,
-                chunk_index=chunk["index"],
-                chunk_metadata=chunk["metadata"]
+        for i, chunk in enumerate(chunks):
+            doc_chunk = DocumentChunk(
+                document_id=document.id,
+                chunk_index=i,
+                text=chunk["text"],
+                embedding=embeddings[i],
+                metadata=chunk["metadata"]
             )
-            db.add(vector_chunk)
+            db.add(doc_chunk)
         
-        attributes = AttributeExtractor.extract_attributes(text)
+        attributes = AttributeExtractor.extract_attributes(text_content, db)
         
-        new_attrs = [
-            {
-                "key": attr["key"],
-                "value": attr["value"],
-                "category": attr["category"],
-                "source_doc_id": str(document.id)
-            }
-            for attr in attributes
-        ]
-        
-        kb_stats = run_kb_manager(document.user_id, new_attrs)
+        for attr_data in attributes:
+            existing = db.query(Attribute).filter(
+                Attribute.company_id == document.company_id,
+                Attribute.key == attr_data["key"]
+            ).first()
+            
+            if existing:
+                existing.value = attr_data["value"]
+                existing.category = attr_data.get("category")
+                existing.source_doc_id = document.id
+            else:
+                attribute = Attribute(
+                    user_id=document.user_id,
+                    company_id=document.company_id,
+                    key=attr_data["key"],
+                    value=attr_data["value"],
+                    category=attr_data.get("category"),
+                    source_doc_id=document.id
+                )
+                db.add(attribute)
         
         document.processing_status = ProcessingStatus.COMPLETED
         db.commit()
         
-        return {
-            "status": "completed", 
-            "doc_id": str(doc_id),
-            "attributes_extracted": len(attributes),
-            "kb_stats": kb_stats
-        }
+        return {"status": "completed", "document_id": str(document_id), "chunks_count": len(chunks)}
     
     except Exception as e:
         document.processing_status = ProcessingStatus.FAILED

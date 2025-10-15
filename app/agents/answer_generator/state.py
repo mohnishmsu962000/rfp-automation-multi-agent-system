@@ -3,6 +3,7 @@ from uuid import UUID
 
 class AnswerGeneratorState(TypedDict):
     user_id: Optional[UUID]
+    company_id: Optional[UUID]
     question: str
     decomposed_queries: List[str]
     attribute_results: List[Dict]

@@ -1,16 +1,23 @@
 from sqlalchemy.orm import Session
 from app.models.vector_chunk import VectorChunk
+from app.models.document import Document
 from app.services.embedding_service import EmbeddingService
 from typing import List, Dict
 from rank_bm25 import BM25Okapi
 from app.core.config import get_settings
+from uuid import UUID
 
 settings = get_settings()
 
 class RAGService:
     @staticmethod
-    def search_similar_chunks(query: str, db: Session, top_k: int = 5) -> List[Dict]:
-        all_chunks = db.query(VectorChunk).all()
+    def search_similar_chunks(query: str, db: Session, company_id: UUID, top_k: int = 5) -> List[Dict]:
+        all_chunks = db.query(VectorChunk).join(Document).filter(
+            Document.company_id == company_id
+        ).all()
+        
+        if not all_chunks:
+            return []
         
         query_embedding = EmbeddingService.generate_embedding(query)
         
@@ -19,6 +26,8 @@ class RAGService:
             VectorChunk.chunk_text,
             VectorChunk.chunk_metadata,
             VectorChunk.embedding.cosine_distance(query_embedding).label("distance")
+        ).join(Document).filter(
+            Document.company_id == company_id
         ).order_by("distance").limit(top_k * 2).all()
         
         corpus = [chunk.chunk_text for chunk in all_chunks]

@@ -6,11 +6,11 @@ from uuid import UUID
 
 class AttributeSearchService:
     @staticmethod
-    def search_attributes(query: str, user_id: UUID, db: Session, top_k: int = 3) -> List[Dict]:
+    def search_attributes(query: str, company_id: UUID, db: Session, top_k: int = 3) -> List[Dict]:
         query_embedding = EmbeddingService.generate_embedding(query)
         
         all_attributes = db.query(Attribute).filter(
-            Attribute.user_id == user_id
+            Attribute.company_id == company_id
         ).all()
         
         if not all_attributes:

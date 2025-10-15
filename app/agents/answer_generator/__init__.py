@@ -4,11 +4,12 @@ from sqlalchemy.orm import Session
 from typing import Dict, Optional
 from uuid import UUID
 
-def generate_answer_for_question(question: str, db: Session, user_id: Optional[UUID] = None) -> Dict:
+def generate_answer_for_question(question: str, db: Session, user_id: Optional[UUID] = None, company_id: Optional[UUID] = None) -> Dict:
     graph = create_answer_generator_graph(db)
     
     initial_state = {
         "user_id": user_id,
+        "company_id": company_id,
         "question": question,
         "decomposed_queries": [],
         "attribute_results": [],

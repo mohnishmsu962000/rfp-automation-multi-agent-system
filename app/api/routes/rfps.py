@@ -1,36 +1,38 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
-from app.core.errors import APIError
+from app.core.auth import get_current_user
 from app.models.rfp_project import RFPProject, RFPStatus
 from app.models.rfp_question import RFPQuestion
-from app.api.schemas.rfp import RFPProjectResponse, RFPQuestionResponse
+from app.api.schemas.rfp import RFPProjectResponse, RFPQuestionResponse, QuestionUpdate, RephraseRequest
 from app.services.storage import StorageService
-from app.workers.rfp_tasks import process_rfp_task
-from app.api.schemas.rfp import QuestionUpdate
-from datetime import datetime
-from uuid import UUID
+from app.services.rate_limiter import RateLimiter
+from app.services.export_service import ExportService
 from app.services.llm_factory import LLMFactory
 from app.prompts.answer_generator import REPHRASE_ANSWER_SYSTEM, REPHRASE_ANSWER_USER
 from langchain_core.messages import SystemMessage, HumanMessage
-from app.api.schemas.rfp import RephraseRequest
-from fastapi.responses import StreamingResponse
-from app.services.export_service import ExportService
+from app.workers.rfp_tasks import process_rfp_task
+from uuid import UUID
+from datetime import datetime
 import io
-from app.services.rate_limiter import RateLimiter
+import uuid
 
 router = APIRouter(prefix="/api/rfps", tags=["rfps"])
+
 
 @router.post("/", response_model=dict)
 async def upload_rfp(
     file: UploadFile = File(...),
     rfp_name: str = Form(...),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    user_id = uuid.UUID(current_user["user_id"])
+    company_id = uuid.UUID(current_user["company_id"])
     
-    allowed, used, remaining = RateLimiter.check_rfp_quota(HARDCODED_USER_ID, db)
+    allowed, used, remaining = RateLimiter.check_rfp_quota(company_id, db)
     
     if not allowed:
         raise HTTPException(
@@ -42,7 +44,8 @@ async def upload_rfp(
     file_url = StorageService.upload_file(file_content, file.filename, bucket="rfps")
     
     rfp = RFPProject(
-        user_id=HARDCODED_USER_ID,
+        user_id=user_id,
+        company_id=company_id,
         rfp_name=rfp_name,
         rfp_file_url=file_url,
         status=RFPStatus.PENDING
@@ -61,64 +64,48 @@ async def upload_rfp(
     }
 
 @router.get("/", response_model=List[RFPProjectResponse])
-def get_rfps(db: Session = Depends(get_db)):
-    user_id = "550e8400-e29b-41d4-a716-446655440000"
-    rfps = db.query(RFPProject).filter(RFPProject.user_id == user_id).all()
+def get_rfps(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    company_id = uuid.UUID(current_user["company_id"])
+    
+    rfps = db.query(RFPProject).filter(
+        RFPProject.company_id == company_id
+    ).all()
     return rfps
 
-@router.get("/{rfp_id}", response_model=dict)
-def get_rfp_with_questions(rfp_id: str, db: Session = Depends(get_db)):
-    user_id = "550e8400-e29b-41d4-a716-446655440000"
+@router.get("/{rfp_id}", response_model=RFPProjectResponse)
+def get_rfp(
+    rfp_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    company_id = uuid.UUID(current_user["company_id"])
     
     rfp = db.query(RFPProject).filter(
         RFPProject.id == rfp_id,
-        RFPProject.user_id == user_id
+        RFPProject.company_id == company_id
     ).first()
     
     if not rfp:
-        raise APIError(status_code=404, message="RFP not found")
+        raise HTTPException(status_code=404, detail="RFP not found")
     
-    questions = db.query(RFPQuestion).filter(
-        RFPQuestion.project_id == rfp_id
-    ).all()
-    
-    return {
-        "rfp": RFPProjectResponse.from_orm(rfp),
-        "questions": [RFPQuestionResponse.from_orm(q) for q in questions]
-    }
-
-@router.delete("/{rfp_id}")
-def delete_rfp(rfp_id: str, db: Session = Depends(get_db)):
-    user_id = "550e8400-e29b-41d4-a716-446655440000"
-    
-    rfp = db.query(RFPProject).filter(
-        RFPProject.id == rfp_id,
-        RFPProject.user_id == user_id
-    ).first()
-    
-    if not rfp:
-        raise APIError(status_code=404, message="RFP not found")
-    
-    db.query(RFPQuestion).filter(RFPQuestion.project_id == rfp_id).delete()
-    StorageService.delete_file(rfp.rfp_file_url, bucket="rfps")
-    db.delete(rfp)
-    db.commit()
-    
-    return {"success": True, "message": "RFP deleted"}
-
+    return rfp
 
 @router.patch("/{rfp_id}/questions/{question_id}", response_model=dict)
 def update_question_answer(
     rfp_id: UUID,
     question_id: UUID,
     data: QuestionUpdate,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    company_id = uuid.UUID(current_user["company_id"])
     
     rfp = db.query(RFPProject).filter(
         RFPProject.id == rfp_id,
-        RFPProject.user_id == HARDCODED_USER_ID
+        RFPProject.company_id == company_id
     ).first()
     
     if not rfp:
@@ -144,21 +131,20 @@ def update_question_answer(
         "message": "Answer updated successfully",
         "question_id": str(question.id)
     }
-    
-
 
 @router.post("/{rfp_id}/questions/{question_id}/rephrase", response_model=dict)
 def rephrase_answer(
     rfp_id: UUID,
     question_id: UUID,
     data: RephraseRequest,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    company_id = uuid.UUID(current_user["company_id"])
     
     rfp = db.query(RFPProject).filter(
         RFPProject.id == rfp_id,
-        RFPProject.user_id == HARDCODED_USER_ID
+        RFPProject.company_id == company_id
     ).first()
     
     if not rfp:
@@ -197,20 +183,19 @@ def rephrase_answer(
         "instruction": data.instruction,
         "note": "This is a preview. Use PATCH endpoint to save if you want to keep it."
     }
-    
-    
 
 @router.get("/{rfp_id}/export")
 def export_rfp(
     rfp_id: UUID,
     format: str = "xlsx",
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    company_id = uuid.UUID(current_user["company_id"])
     
     rfp = db.query(RFPProject).filter(
         RFPProject.id == rfp_id,
-        RFPProject.user_id == HARDCODED_USER_ID
+        RFPProject.company_id == company_id
     ).first()
     
     if not rfp:

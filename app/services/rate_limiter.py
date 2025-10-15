@@ -15,9 +15,9 @@ RATE_LIMITS = {
 class RateLimiter:
     
     @staticmethod
-    def check_document_quota(user_id: UUID, db: Session) -> tuple[bool, int, int]:
+    def check_document_quota(company_id: UUID, db: Session) -> tuple[bool, int, int]:
         quota = db.query(DocumentQuota).filter(
-            DocumentQuota.user_id == user_id
+            DocumentQuota.company_id == company_id
         ).first()
         
         current_count = quota.document_count if quota else 0
@@ -29,9 +29,9 @@ class RateLimiter:
         return True, current_count, remaining
     
     @staticmethod
-    def increment_document_quota(user_id: UUID, db: Session):
+    def increment_document_quota(company_id: UUID, db: Session):
         quota = db.query(DocumentQuota).filter(
-            DocumentQuota.user_id == user_id
+            DocumentQuota.company_id == company_id
         ).first()
         
         if quota:
@@ -39,7 +39,7 @@ class RateLimiter:
             quota.updated_at = datetime.utcnow()
         else:
             quota = DocumentQuota(
-                user_id=user_id,
+                company_id=company_id,
                 document_count=1
             )
             db.add(quota)
@@ -47,11 +47,11 @@ class RateLimiter:
         db.commit()
     
     @staticmethod
-    def check_rfp_quota(user_id: UUID, db: Session) -> tuple[bool, int, int]:
+    def check_rfp_quota(company_id: UUID, db: Session) -> tuple[bool, int, int]:
         month_year = datetime.utcnow().strftime("%Y-%m")
         
         count = db.query(RFPProject).filter(
-            RFPProject.user_id == user_id,
+            RFPProject.company_id == company_id,
             RFPProject.created_at >= datetime.strptime(month_year, "%Y-%m")
         ).count()
         
@@ -63,21 +63,21 @@ class RateLimiter:
         return True, count, remaining
     
     @staticmethod
-    def get_usage_stats(user_id: UUID, db: Session) -> dict:
+    def get_usage_stats(company_id: UUID, db: Session) -> dict:
         doc_quota = db.query(DocumentQuota).filter(
-            DocumentQuota.user_id == user_id
+            DocumentQuota.company_id == company_id
         ).first()
         
         docs_used = doc_quota.document_count if doc_quota else 0
         
         month_year = datetime.utcnow().strftime("%Y-%m")
         rfps_used = db.query(RFPProject).filter(
-            RFPProject.user_id == user_id,
+            RFPProject.company_id == company_id,
             RFPProject.created_at >= datetime.strptime(month_year, "%Y-%m")
         ).count()
         
         resync_quota = db.query(ResyncQuota).filter(
-            ResyncQuota.user_id == user_id,
+            ResyncQuota.company_id == company_id,
             ResyncQuota.month_year == month_year
         ).first()
         

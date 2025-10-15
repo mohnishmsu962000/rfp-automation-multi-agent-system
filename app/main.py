@@ -4,6 +4,7 @@ from app.api.routes import documents
 from app.core.config import get_settings
 from app.api.routes import documents, rfps
 from app.api.routes import documents, rfps, attributes
+from app.api.routes import auth
 
 settings = get_settings()
 
@@ -20,6 +21,7 @@ app.add_middleware(
 app.include_router(documents.router)
 app.include_router(rfps.router)
 app.include_router(attributes.router, prefix="/api/attributes", tags=["attributes"])
+app.include_router(auth.router)
 
 @app.get("/health")
 def health_check():
