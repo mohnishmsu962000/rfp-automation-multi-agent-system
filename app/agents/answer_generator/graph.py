@@ -6,17 +6,32 @@ from app.agents.answer_generator.nodes.search_attributes import search_attribute
 from app.agents.answer_generator.nodes.search import search_rag_node
 from app.agents.answer_generator.nodes.generate import generate_answer_node
 
+def should_decompose(state: AnswerGeneratorState) -> str:
+    attribute_results = state.get("attribute_results", [])
+    
+    if attribute_results and attribute_results[0]["similarity"] > 0.5:
+        return "generate"
+    
+    return "decompose"
+
 def create_answer_generator_graph(db: Session):
     workflow = StateGraph(AnswerGeneratorState)
     
-    workflow.add_node("decompose", decompose_query_node)
     workflow.add_node("search_attributes", search_attributes)
+    workflow.add_node("decompose", decompose_query_node)
     workflow.add_node("search", lambda state: search_rag_node(state, db))
     workflow.add_node("generate", generate_answer_node)
     
-    workflow.set_entry_point("decompose")
-    workflow.add_edge("decompose", "search_attributes")
-    workflow.add_edge("search_attributes", "search")
+    workflow.set_entry_point("search_attributes")
+    workflow.add_conditional_edges(
+        "search_attributes",
+        should_decompose,
+        {
+            "generate": "generate",
+            "decompose": "decompose"
+        }
+    )
+    workflow.add_edge("decompose", "search")
     workflow.add_edge("search", "generate")
     workflow.add_edge("generate", END)
     
