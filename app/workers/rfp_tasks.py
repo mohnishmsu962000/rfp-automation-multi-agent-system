@@ -8,15 +8,17 @@ import httpx
 import tempfile
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from uuid import UUID
 
-def process_single_question(question_text: str, rfp_id: str):
+def process_single_question(question_text: str, rfp_id: str, user_id: str):
     db = SessionLocal()
     try:
-        answer_result = generate_answer_for_question(question_text, db)
+        answer_result = generate_answer_for_question(question_text, db, UUID(user_id))
         return {
             "question": question_text,
             "answer": answer_result["answer"],
-            "trust_score": float(answer_result["trust_score"])
+            "trust_score": float(answer_result["trust_score"]),
+            "source_type": answer_result.get("source_type", "rag")
         }
     finally:
         db.close()
@@ -45,7 +47,7 @@ def process_rfp_task(rfp_id: str):
         
         results = []
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(process_single_question, q, str(rfp.id)): q for q in questions}
+            futures = {executor.submit(process_single_question, q, str(rfp.id), str(rfp.user_id)): q for q in questions}
             for future in as_completed(futures):
                 try:
                     result = future.result()
@@ -55,7 +57,8 @@ def process_rfp_task(rfp_id: str):
                     results.append({
                         "question": question,
                         "answer": f"Error generating answer: {str(e)}",
-                        "trust_score": 0.0
+                        "trust_score": 0.0,
+                        "source_type": "error"
                     })
         
         for result in results:
@@ -64,7 +67,7 @@ def process_rfp_task(rfp_id: str):
                 question_text=result["question"],
                 answer_text=result["answer"],
                 trust_score=result["trust_score"],
-                source_type="rag",
+                source_type=result.get("source_type", "rag"),
                 user_edited=False
             )
             db.add(rfp_question)

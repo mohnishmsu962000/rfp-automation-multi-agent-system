@@ -13,3 +13,15 @@ Context:
 Question: {question}
 
 Answer:"""
+
+
+
+ATTRIBUTE_BASED_ANSWER = """Based on the following company attribute, answer this question:
+
+Question: {question}
+
+Attribute: {key}
+Value: {value}
+Category: {category}
+
+Provide a clear, professional answer using this information."""

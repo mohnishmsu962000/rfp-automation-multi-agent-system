@@ -96,10 +96,13 @@ def delete_document(
     return {"success": True, "message": "Document deleted"}
 
 
+
 @router.post("/test-answer")
 def test_answer_generation(
     question: str,
     db: Session = Depends(get_db)
 ):
-    result = generate_answer_for_question(question, db)
+    from uuid import UUID
+    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    result = generate_answer_for_question(question, db, HARDCODED_USER_ID)
     return result
