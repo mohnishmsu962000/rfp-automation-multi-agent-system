@@ -5,7 +5,7 @@ from app.models.vector_chunk import VectorChunk as DocumentChunk
 from app.models.attribute import Attribute
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
-from app.agents.attribute_extractor import AttributeExtractor
+from app.services.attribute_extractor import AttributeExtractor
 import httpx
 import tempfile
 import os
