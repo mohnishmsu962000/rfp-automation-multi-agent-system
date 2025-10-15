@@ -2,11 +2,11 @@ from app.workers.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.document import Document, ProcessingStatus
 from app.models.vector_chunk import VectorChunk
-from app.models.attribute import Attribute
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
 from app.services.storage import StorageService
 from app.services.attribute_extractor import AttributeExtractor
+from app.agents.kb_manager import run_kb_manager
 import httpx
 import tempfile
 import os
@@ -50,15 +50,17 @@ def process_document_task(doc_id: str):
         
         attributes = AttributeExtractor.extract_attributes(text)
         
-        for attr in attributes:
-            attribute_obj = Attribute(
-                user_id=document.user_id,
-                key=attr["key"],
-                value=attr["value"],
-                category=attr["category"],
-                source_doc_id=document.id
-            )
-            db.add(attribute_obj)
+        new_attrs = [
+            {
+                "key": attr["key"],
+                "value": attr["value"],
+                "category": attr["category"],
+                "source_doc_id": str(document.id)
+            }
+            for attr in attributes
+        ]
+        
+        kb_stats = run_kb_manager(document.user_id, new_attrs)
         
         document.processing_status = ProcessingStatus.COMPLETED
         db.commit()
@@ -66,7 +68,8 @@ def process_document_task(doc_id: str):
         return {
             "status": "completed", 
             "doc_id": str(doc_id),
-            "attributes_extracted": len(attributes)
+            "attributes_extracted": len(attributes),
+            "kb_stats": kb_stats
         }
     
     except Exception as e:
