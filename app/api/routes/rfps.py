@@ -15,6 +15,9 @@ from app.services.llm_factory import LLMFactory
 from app.prompts.answer_generator import REPHRASE_ANSWER_SYSTEM, REPHRASE_ANSWER_USER
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.api.schemas.rfp import RephraseRequest
+from fastapi.responses import StreamingResponse
+from app.services.export_service import ExportService
+import io
 
 router = APIRouter(prefix="/api/rfps", tags=["rfps"])
 
@@ -185,3 +188,49 @@ def rephrase_answer(
         "instruction": data.instruction,
         "note": "This is a preview. Use PATCH endpoint to save if you want to keep it."
     }
+    
+    
+
+@router.get("/{rfp_id}/export")
+def export_rfp(
+    rfp_id: UUID,
+    format: str = "xlsx",
+    db: Session = Depends(get_db)
+):
+    HARDCODED_USER_ID = UUID("550e8400-e29b-41d4-a716-446655440000")
+    
+    rfp = db.query(RFPProject).filter(
+        RFPProject.id == rfp_id,
+        RFPProject.user_id == HARDCODED_USER_ID
+    ).first()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP not found")
+    
+    questions = db.query(RFPQuestion).filter(
+        RFPQuestion.project_id == rfp_id
+    ).order_by(RFPQuestion.created_at).all()
+    
+    if not questions:
+        raise HTTPException(status_code=400, detail="No questions found for this RFP")
+    
+    if format == "xlsx":
+        content = ExportService.export_to_excel(rfp, questions)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        filename = f"{rfp.rfp_name.replace(' ', '_')}.xlsx"
+    elif format == "docx":
+        content = ExportService.export_to_docx(rfp, questions)
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        filename = f"{rfp.rfp_name.replace(' ', '_')}.docx"
+    elif format == "pdf":
+        content = ExportService.export_to_pdf(rfp, questions)
+        media_type = "application/pdf"
+        filename = f"{rfp.rfp_name.replace(' ', '_')}.pdf"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid format. Use xlsx, docx, or pdf")
+    
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
