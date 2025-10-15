@@ -2,12 +2,15 @@ from app.workers.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.document import Document, ProcessingStatus
 from app.models.vector_chunk import VectorChunk
+from app.models.attribute import Attribute
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
 from app.services.storage import StorageService
+from app.services.attribute_extractor import AttributeExtractor
 import httpx
 import tempfile
 import os
+from app.workers.rfp_tasks import process_rfp_task
 
 @celery_app.task(name="process_document")
 def process_document_task(doc_id: str):
@@ -45,10 +48,26 @@ def process_document_task(doc_id: str):
             )
             db.add(vector_chunk)
         
+        attributes = AttributeExtractor.extract_attributes(text)
+        
+        for attr in attributes:
+            attribute_obj = Attribute(
+                user_id=document.user_id,
+                key=attr["key"],
+                value=attr["value"],
+                category=attr["category"],
+                source_doc_id=document.id
+            )
+            db.add(attribute_obj)
+        
         document.processing_status = ProcessingStatus.COMPLETED
         db.commit()
         
-        return {"status": "completed", "doc_id": str(doc_id)}
+        return {
+            "status": "completed", 
+            "doc_id": str(doc_id),
+            "attributes_extracted": len(attributes)
+        }
     
     except Exception as e:
         document.processing_status = ProcessingStatus.FAILED
