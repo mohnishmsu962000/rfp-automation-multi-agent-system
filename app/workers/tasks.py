@@ -11,6 +11,7 @@ import httpx
 import tempfile
 import os
 from app.workers.rfp_tasks import process_rfp_task
+from app.workers.attribute_tasks import resync_attributes_task
 
 @celery_app.task(name="process_document")
 def process_document_task(doc_id: str):

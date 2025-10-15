@@ -24,3 +24,14 @@ class AttributeResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        
+
+class ResyncResponse(BaseModel):
+    job_id: str
+    message: str
+
+class QuotaResponse(BaseModel):
+    month_year: str
+    resyncs_used: int
+    resyncs_remaining: int
+    last_resync_at: Optional[datetime]
