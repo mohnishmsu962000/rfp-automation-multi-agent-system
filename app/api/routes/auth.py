@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_user
@@ -7,6 +7,9 @@ from app.models.user_company import UserCompany
 from app.models.user import User
 from pydantic import BaseModel
 from uuid import UUID
+from typing import Optional
+import jwt
+from jwt import PyJWKClient
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -19,14 +22,42 @@ class OnboardingResponse(BaseModel):
     company_id: str
     message: str
 
+async def get_user_id_only(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    
+    try:
+        jwks_url = "https://helping-grizzly-76.clerk.accounts.dev/.well-known/jwks.json"
+        jwks_client = PyJWKClient(jwks_url)
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        
+        decoded = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_exp": True}
+        )
+        
+        user_id = decoded.get("sub")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
+        
+        return user_id
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+
 @router.post("/onboard", response_model=OnboardingResponse)
-def onboard_user(
+async def onboard_user(
     data: OnboardingRequest,
-    current_user: dict = Depends(get_current_user),
+    user_id: str = Depends(get_user_id_only),
     db: Session = Depends(get_db)
 ):
-    user_id = current_user["user_id"]
-    
     existing = db.query(UserCompany).filter(UserCompany.user_id == user_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="User already onboarded")
