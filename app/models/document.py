@@ -32,4 +32,4 @@ class Document(Base):
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     processing_status = Column(SQLEnum(ProcessingStatus), default=ProcessingStatus.PENDING)
     
-    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
+    chunks = relationship("VectorChunk", back_populates="document", cascade="all, delete-orphan")
