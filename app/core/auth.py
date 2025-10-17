@@ -5,7 +5,9 @@ from app.core.database import SessionLocal
 from app.models.user_company import UserCompany
 import jwt
 from jwt import PyJWKClient
+import logging
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
@@ -16,9 +18,12 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     
     try:
         jwks_url = "https://helping-grizzly-76.clerk.accounts.dev/.well-known/jwks.json"
+        logger.info(f"Fetching JWKS from: {jwks_url}")
+        
         jwks_client = PyJWKClient(jwks_url)
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         
+        logger.info("Decoding JWT token...")
         decoded = jwt.decode(
             token,
             signing_key.key,
@@ -27,6 +32,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         )
         
         user_id = decoded.get("sub")
+        logger.info(f"User ID from token: {user_id}")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
@@ -50,4 +56,5 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Authentication error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
