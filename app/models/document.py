@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, ARRAY
+from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, ARRAY, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -24,7 +24,7 @@ class Document(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=False)
-    company_id = Column(UUID(as_uuid=True), nullable=False)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)
     doc_type = Column(SQLEnum(DocType), nullable=False)
@@ -33,3 +33,4 @@ class Document(Base):
     processing_status = Column(SQLEnum(ProcessingStatus), default=ProcessingStatus.PENDING)
     
     chunks = relationship("VectorChunk", back_populates="document", cascade="all, delete-orphan")
+    company = relationship("Company", back_populates="documents")
