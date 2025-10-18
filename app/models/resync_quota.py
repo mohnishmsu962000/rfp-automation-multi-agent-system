@@ -8,7 +8,6 @@ class ResyncQuota(Base):
     __tablename__ = "resync_quota"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String, nullable=False)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False, index=True)
     month_year = Column(String, nullable=False)
     resync_count = Column(Integer, default=0)
