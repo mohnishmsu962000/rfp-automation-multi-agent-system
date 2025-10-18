@@ -228,3 +228,28 @@ def export_rfp(
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+    
+    
+@router.delete("/{rfp_id}", response_model=dict)
+def delete_rfp(
+    rfp_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    company_id = uuid.UUID(current_user["company_id"])
+    
+    rfp = db.query(RFPProject).filter(
+        RFPProject.id == rfp_id,
+        RFPProject.company_id == company_id
+    ).first()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP not found")
+    
+    db.delete(rfp)
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "RFP deleted successfully"
+    }
