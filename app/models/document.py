@@ -7,17 +7,17 @@ import uuid
 import enum
 
 class DocType(str, enum.Enum):
-    PROPOSAL = "proposal"
-    CONTRACT = "contract"
-    REPORT = "report"
-    PRESENTATION = "presentation"
-    OTHER = "other"
+    PROPOSAL = "PROPOSAL"
+    CONTRACT = "CONTRACT"
+    REPORT = "REPORT"
+    PRESENTATION = "PRESENTATION"
+    OTHER = "OTHER"
 
 class ProcessingStatus(str, enum.Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 class Document(Base):
     __tablename__ = "documents"

@@ -3,6 +3,7 @@ from app.core.database import SessionLocal
 from app.models.document import Document, ProcessingStatus
 from app.models.vector_chunk import VectorChunk as DocumentChunk
 from app.models.attribute import Attribute
+from app.models.company import Company
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
 from app.services.attribute_extractor import AttributeExtractor
@@ -13,6 +14,7 @@ import os
 @celery_app.task(name="process_document")
 def process_document_task(document_id: str):
     db = SessionLocal()
+    document = None
     
     try:
         document = db.query(Document).filter(Document.id == document_id).first()
@@ -75,8 +77,9 @@ def process_document_task(document_id: str):
         return {"status": "completed", "document_id": str(document_id), "chunks_count": len(chunks)}
     
     except Exception as e:
-        document.processing_status = ProcessingStatus.FAILED
-        db.commit()
+        if document:
+            document.processing_status = ProcessingStatus.FAILED
+            db.commit()
         return {"error": str(e)}
     
     finally:
