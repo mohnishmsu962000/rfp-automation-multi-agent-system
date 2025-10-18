@@ -11,6 +11,8 @@ import uuid
 from app.workers.tasks import process_document_task
 from app.agents.answer_generator import generate_answer_for_question
 from app.services.rate_limiter import RateLimiter
+from app.models.document_quota import DocumentQuota
+from datetime import datetime
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -46,6 +48,20 @@ async def upload_document(
     
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
     
+    quota = db.query(DocumentQuota).filter(
+        DocumentQuota.company_id == company_id
+    ).first()
+    
+    if quota:
+        quota.document_count += 1
+        quota.updated_at = datetime.utcnow()
+    else:
+        quota = DocumentQuota(
+            company_id=company_id,
+            document_count=1
+        )
+        db.add(quota)
+    
     document = Document(
         user_id=user_id,
         company_id=company_id,
@@ -59,8 +75,6 @@ async def upload_document(
     db.add(document)
     db.commit()
     db.refresh(document)
-    
-    RateLimiter.increment_document_quota(company_id, db)
     
     process_document_task.delay(str(document.id))
     
