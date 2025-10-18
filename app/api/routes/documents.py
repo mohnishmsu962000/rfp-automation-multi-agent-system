@@ -13,6 +13,8 @@ from datetime import datetime
 from app.workers.tasks import process_document_task
 from app.agents.answer_generator import generate_answer_for_question
 from app.services.rate_limiter import RateLimiter
+from app.models.document_quota import DocumentQuota
+from datetime import datetime
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -134,6 +136,16 @@ def delete_document(
     
     StorageService.delete_file(document.file_url)
     db.delete(document)
+    
+    
+    quota = db.query(DocumentQuota).filter(
+        DocumentQuota.company_id == company_id
+    ).first()
+    
+    if quota and quota.document_count > 0:
+        quota.document_count -= 1
+        quota.updated_at = datetime.utcnow()
+    
     db.commit()
     
     return {"success": True, "message": "Document deleted"}
