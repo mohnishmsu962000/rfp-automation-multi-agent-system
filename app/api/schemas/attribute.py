@@ -1,12 +1,11 @@
 from pydantic import BaseModel
 from typing import Optional
-from datetime import datetime
 from uuid import UUID
 
 class AttributeCreate(BaseModel):
     key: str
     value: str
-    category: str
+    category: Optional[str] = None
 
 class AttributeUpdate(BaseModel):
     key: Optional[str] = None
@@ -15,23 +14,11 @@ class AttributeUpdate(BaseModel):
 
 class AttributeResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    user_id: str
+    company_id: UUID
     key: str
     value: str
-    category: str
-    source_doc_id: Optional[UUID]
-    last_updated: datetime
+    category: Optional[str] = None
     
     class Config:
         from_attributes = True
-        
-
-class ResyncResponse(BaseModel):
-    job_id: str
-    message: str
-
-class QuotaResponse(BaseModel):
-    month_year: str
-    resyncs_used: int
-    resyncs_remaining: int
-    last_resync_at: Optional[datetime]
