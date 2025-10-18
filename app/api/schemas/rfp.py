@@ -3,18 +3,6 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
-class RFPProjectResponse(BaseModel):
-    id: UUID
-    user_id: str
-    rfp_name: str
-    rfp_file_url: str
-    status: str
-    created_at: datetime
-    updated_at: datetime
-    
-    class Config:
-        from_attributes = True
-
 class RFPQuestionResponse(BaseModel):
     id: UUID
     project_id: UUID
@@ -23,6 +11,21 @@ class RFPQuestionResponse(BaseModel):
     trust_score: float
     source_type: Optional[str]
     user_edited: bool
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class RFPProjectResponse(BaseModel):
+    id: UUID
+    user_id: str
+    rfp_name: str
+    rfp_file_url: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    questions: Optional[List[RFPQuestionResponse]] = []
     
     class Config:
         from_attributes = True
