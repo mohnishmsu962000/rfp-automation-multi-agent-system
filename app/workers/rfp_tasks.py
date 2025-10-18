@@ -13,7 +13,7 @@ from uuid import UUID
 def process_single_question(question_text: str, rfp_id: str, user_id: str, company_id: str):
     db = SessionLocal()
     try:
-        answer_result = generate_answer_for_question(question_text, db, UUID(user_id), UUID(company_id))
+        answer_result = generate_answer_for_question(question_text, db, user_id, UUID(company_id))
         return {
             "question": question_text,
             "answer": answer_result["answer"],
