@@ -1,10 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import documents
+from app.api.routes import documents, rfps, attributes, auth
 from app.core.config import get_settings
-from app.api.routes import documents, rfps
-from app.api.routes import documents, rfps, attributes
-from app.api.routes import auth
+from app.core.database import Base, engine
 
 settings = get_settings()
 
@@ -17,6 +15,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+Base.metadata.create_all(bind=engine)
 
 app.include_router(documents.router)
 app.include_router(rfps.router)
