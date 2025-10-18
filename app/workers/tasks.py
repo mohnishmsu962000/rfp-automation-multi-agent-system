@@ -50,10 +50,13 @@ def process_document_task(document_id: str):
         
         db.commit()
         
+        print(f"Extracting attributes from text of length: {len(text_content)}")
         attributes = AttributeExtractor.extract_attributes(text_content)
+        print(f"Extracted {len(attributes)} attributes: {attributes}")
         
         for attr_data in attributes:
             try:
+                print(f"Processing attribute: {attr_data}")
                 existing = db.query(Attribute).filter(
                     Attribute.company_id == document.company_id,
                     Attribute.key == attr_data["key"]
@@ -63,6 +66,7 @@ def process_document_task(document_id: str):
                     existing.value = attr_data["value"]
                     existing.category = attr_data.get("category")
                     existing.source_doc_id = document.id
+                    print(f"Updated existing attribute: {attr_data['key']}")
                 else:
                     attribute = Attribute(
                         user_id=document.user_id,
@@ -73,8 +77,10 @@ def process_document_task(document_id: str):
                         source_doc_id=document.id
                     )
                     db.add(attribute)
+                    print(f"Created new attribute: {attr_data['key']}")
                 
                 db.commit()
+                print(f"Successfully saved attribute: {attr_data['key']}")
             except Exception as attr_error:
                 db.rollback()
                 print(f"Error saving attribute {attr_data.get('key')}: {str(attr_error)}")
@@ -83,7 +89,7 @@ def process_document_task(document_id: str):
         document.processing_status = ProcessingStatus.COMPLETED
         db.commit()
         
-        return {"status": "completed", "document_id": str(document_id), "chunks_count": len(chunks)}
+        return {"status": "completed", "document_id": str(document_id), "chunks_count": len(chunks), "attributes_count": len(attributes)}
     
     except Exception as e:
         db.rollback()
