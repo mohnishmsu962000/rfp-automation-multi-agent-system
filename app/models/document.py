@@ -23,7 +23,7 @@ class Document(Base):
     __tablename__ = "documents"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(String, nullable=False)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     filename = Column(String, nullable=False)
     file_url = Column(String, nullable=False)

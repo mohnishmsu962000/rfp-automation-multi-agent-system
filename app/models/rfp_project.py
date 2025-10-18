@@ -16,7 +16,7 @@ class RFPProject(Base):
     __tablename__ = "rfp_projects"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(String, nullable=False)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     rfp_name = Column(String, nullable=False)
     rfp_file_url = Column(String, nullable=False)

@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.models.attribute import Attribute
-from app.api.schemas.attribute import AttributeResponse, AttributeUpdate
+from app.api.schemas.attribute import AttributeResponse, AttributeUpdate, AttributeCreate
 from uuid import UUID
 import uuid
 
@@ -32,6 +32,29 @@ def get_attributes(
     
     attributes = query.all()
     return attributes
+
+@router.post("/", response_model=AttributeResponse)
+def create_attribute(
+    data: AttributeCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    user_id = current_user["user_id"]
+    company_id = uuid.UUID(current_user["company_id"])
+    
+    attribute = Attribute(
+        user_id=user_id,
+        company_id=company_id,
+        key=data.key,
+        value=data.value,
+        category=data.category
+    )
+    
+    db.add(attribute)
+    db.commit()
+    db.refresh(attribute)
+    
+    return attribute
 
 @router.get("/{attribute_id}", response_model=AttributeResponse)
 def get_attribute(
@@ -68,6 +91,8 @@ def update_attribute(
     if not attribute:
         raise HTTPException(status_code=404, detail="Attribute not found")
     
+    if data.key is not None:
+        attribute.key = data.key
     if data.value is not None:
         attribute.value = data.value
     if data.category is not None:

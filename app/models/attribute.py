@@ -9,7 +9,7 @@ class Attribute(Base):
     __tablename__ = "attributes"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(String, nullable=False)
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     key = Column(String, nullable=False)
     value = Column(String, nullable=False)

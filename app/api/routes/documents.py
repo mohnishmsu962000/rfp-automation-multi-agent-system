@@ -30,7 +30,7 @@ async def upload_document(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    user_id = uuid.UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
     allowed, used, remaining = RateLimiter.check_document_quota(company_id, db)
@@ -130,6 +130,6 @@ def test_answer_generation(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    user_id = uuid.UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
     result = generate_answer_for_question(question, db, user_id)
     return result

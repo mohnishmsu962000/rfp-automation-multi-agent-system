@@ -29,7 +29,7 @@ async def upload_rfp(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    user_id = uuid.UUID(current_user["user_id"])
+    user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
     allowed, used, remaining = RateLimiter.check_rfp_quota(company_id, db)
