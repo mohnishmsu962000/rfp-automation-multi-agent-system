@@ -40,11 +40,11 @@ def process_document_task(document_id: str):
         
         for i, chunk in enumerate(chunks):
             doc_chunk = DocumentChunk(
-                document_id=document.id,
+                doc_id=document.id,
                 chunk_index=i,
-                text=chunk["text"],
+                chunk_text=chunk["text"],
                 embedding=embeddings[i],
-                metadata=chunk["metadata"]
+                chunk_metadata=chunk["metadata"]
             )
             db.add(doc_chunk)
         
