@@ -5,7 +5,7 @@ from uuid import UUID
 
 class RFPProjectResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    user_id: str
     rfp_name: str
     rfp_file_url: str
     status: str
