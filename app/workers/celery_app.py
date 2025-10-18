@@ -6,7 +6,11 @@ settings = get_settings()
 celery_app = Celery(
     "rfp_backend",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
+    backend=settings.REDIS_URL,
+    include=[
+        'app.workers.tasks',
+        'app.workers.rfp_tasks'
+    ]
 )
 
 celery_app.conf.update(
@@ -16,5 +20,3 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
-
-celery_app.autodiscover_tasks(['app.workers'], force=True)
