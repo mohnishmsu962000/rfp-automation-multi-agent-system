@@ -48,28 +48,37 @@ def process_document_task(document_id: str):
             )
             db.add(doc_chunk)
         
+        db.commit()
+        
         attributes = AttributeExtractor.extract_attributes(text_content)
         
         for attr_data in attributes:
-            existing = db.query(Attribute).filter(
-                Attribute.company_id == document.company_id,
-                Attribute.key == attr_data["key"]
-            ).first()
-            
-            if existing:
-                existing.value = attr_data["value"]
-                existing.category = attr_data.get("category")
-                existing.source_doc_id = document.id
-            else:
-                attribute = Attribute(
-                    user_id=document.user_id,
-                    company_id=document.company_id,
-                    key=attr_data["key"],
-                    value=attr_data["value"],
-                    category=attr_data.get("category"),
-                    source_doc_id=document.id
-                )
-                db.add(attribute)
+            try:
+                existing = db.query(Attribute).filter(
+                    Attribute.company_id == document.company_id,
+                    Attribute.key == attr_data["key"]
+                ).first()
+                
+                if existing:
+                    existing.value = attr_data["value"]
+                    existing.category = attr_data.get("category")
+                    existing.source_doc_id = document.id
+                else:
+                    attribute = Attribute(
+                        user_id=document.user_id,
+                        company_id=document.company_id,
+                        key=attr_data["key"],
+                        value=attr_data["value"],
+                        category=attr_data.get("category"),
+                        source_doc_id=document.id
+                    )
+                    db.add(attribute)
+                
+                db.commit()
+            except Exception as attr_error:
+                db.rollback()
+                print(f"Error saving attribute {attr_data.get('key')}: {str(attr_error)}")
+                continue
         
         document.processing_status = ProcessingStatus.COMPLETED
         db.commit()
@@ -77,6 +86,7 @@ def process_document_task(document_id: str):
         return {"status": "completed", "document_id": str(document_id), "chunks_count": len(chunks)}
     
     except Exception as e:
+        db.rollback()
         if document:
             document.processing_status = ProcessingStatus.FAILED
             db.commit()
