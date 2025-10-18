@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
 from app.models.document import DocType, ProcessingStatus
@@ -10,13 +10,14 @@ class DocumentUpload(BaseModel):
 
 class DocumentResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    user_id: str
+    company_id: UUID
     filename: str
     file_url: str
-    doc_type: DocType
+    doc_type: str
     tags: List[str]
     uploaded_at: datetime
-    processing_status: ProcessingStatus
+    processing_status: str
     
     class Config:
         from_attributes = True
