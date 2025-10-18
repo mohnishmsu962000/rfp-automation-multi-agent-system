@@ -48,7 +48,7 @@ def process_document_task(document_id: str):
             )
             db.add(doc_chunk)
         
-        attributes = AttributeExtractor.extract_attributes(text_content, db)
+        attributes = AttributeExtractor.extract_attributes(text_content)
         
         for attr_data in attributes:
             existing = db.query(Attribute).filter(
