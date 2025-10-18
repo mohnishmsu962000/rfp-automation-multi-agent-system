@@ -51,7 +51,7 @@ async def upload_document(
         company_id=company_id,
         filename=file.filename,
         file_url=file_url,
-        doc_type=doc_type.lower(),
+        doc_type=doc_type.upper(),
         tags=tag_list,
         processing_status=ProcessingStatus.PENDING
     )
