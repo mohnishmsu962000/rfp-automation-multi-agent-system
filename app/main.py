@@ -20,7 +20,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(documents.router)
 app.include_router(rfps.router)
-app.include_router(attributes.router, prefix="/api/attributes", tags=["attributes"])
+app.include_router(attributes.router)
 app.include_router(auth.router)
 
 @app.get("/health")
