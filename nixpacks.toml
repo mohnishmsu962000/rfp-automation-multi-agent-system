@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ['...', 'postgresql']
+
+[phases.install]
+cmds = ['pip install uv', 'uv pip install --system -r pyproject.toml']
+
+[start]
+cmd = 'uvicorn app.main:app --host 0.0.0.0 --port $PORT'
