@@ -2,14 +2,16 @@ from app.workers.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.models.document import Document, ProcessingStatus
 from app.models.vector_chunk import VectorChunk as DocumentChunk
-from app.models.attribute import Attribute
-from app.models.company import Company
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
 from app.services.attribute_extractor import AttributeExtractor
+from app.agents.kb_manager import run_kb_manager
 import httpx
 import tempfile
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 @celery_app.task(name="process_document")
 def process_document_task(document_id: str):
@@ -50,49 +52,39 @@ def process_document_task(document_id: str):
         
         db.commit()
         
-        print(f"Extracting attributes from text of length: {len(text_content)}")
+        logger.info(f"Extracting attributes from document {document.id}")
         attributes = AttributeExtractor.extract_attributes(text_content)
-        print(f"Extracted {len(attributes)} attributes: {attributes}")
+        logger.info(f"Extracted {len(attributes)} raw attributes")
         
-        for attr_data in attributes:
-            try:
-                print(f"Processing attribute: {attr_data}")
-                existing = db.query(Attribute).filter(
-                    Attribute.company_id == document.company_id,
-                    Attribute.key == attr_data["key"]
-                ).first()
-                
-                if existing:
-                    existing.value = attr_data["value"]
-                    existing.category = attr_data.get("category")
-                    existing.source_doc_id = document.id
-                    print(f"Updated existing attribute: {attr_data['key']}")
-                else:
-                    attribute = Attribute(
-                        user_id=document.user_id,
-                        company_id=document.company_id,
-                        key=attr_data["key"],
-                        value=attr_data["value"],
-                        category=attr_data.get("category"),
-                        source_doc_id=document.id
-                    )
-                    db.add(attribute)
-                    print(f"Created new attribute: {attr_data['key']}")
-                
-                db.commit()
-                print(f"Successfully saved attribute: {attr_data['key']}")
-            except Exception as attr_error:
-                db.rollback()
-                print(f"Error saving attribute {attr_data.get('key')}: {str(attr_error)}")
-                continue
+        if attributes:
+            new_attrs = [
+                {
+                    "key": attr["key"],
+                    "value": attr["value"],
+                    "category": attr["category"],
+                    "source_doc_id": str(document.id)
+                }
+                for attr in attributes
+            ]
+            
+            kb_stats = run_kb_manager(document.user_id, document.company_id, new_attrs)
+            logger.info(f"KB Manager processed attributes: {kb_stats}")
+        else:
+            kb_stats = {"new_added": 0}
         
         document.processing_status = ProcessingStatus.COMPLETED
         db.commit()
         
-        return {"status": "completed", "document_id": str(document_id), "chunks_count": len(chunks), "attributes_count": len(attributes)}
+        return {
+            "status": "completed",
+            "document_id": str(document_id),
+            "chunks_count": len(chunks),
+            "attributes_stats": kb_stats
+        }
     
     except Exception as e:
         db.rollback()
+        logger.error(f"Error processing document {document_id}: {str(e)}")
         if document:
             document.processing_status = ProcessingStatus.FAILED
             db.commit()

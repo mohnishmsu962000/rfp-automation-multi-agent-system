@@ -3,16 +3,23 @@ from app.core.database import SessionLocal
 from app.models.attribute import Attribute
 from uuid import UUID
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 def save_attributes(state: KBManagerState) -> KBManagerState:
     db = SessionLocal()
     
     try:
-        kept_existing = 0
-        kept_new = 0
-        merged = 0
+        stats = {
+            "kept_existing": 0,
+            "kept_new": 0,
+            "merged": 0,
+            "new_added": 0,
+            "total_conflicts": len(state["conflicts"])
+        }
         
-        resolved_new_attrs = set()
+        resolved_keys = set()
         
         for resolution in state["resolutions"]:
             conflict = resolution["conflict"]
@@ -20,10 +27,11 @@ def save_attributes(state: KBManagerState) -> KBManagerState:
             
             new_attr = conflict["new"]
             existing_attr = conflict["existing"]
-            resolved_new_attrs.add(new_attr["key"])
+            resolved_keys.add((new_attr["key"].lower(), new_attr["category"]))
             
             if decision == "keep_existing":
-                kept_existing += 1
+                stats["kept_existing"] += 1
+                logger.info(f"Kept existing: {existing_attr['key']}")
                 
             elif decision == "keep_new":
                 attr = db.query(Attribute).filter(
@@ -32,39 +40,51 @@ def save_attributes(state: KBManagerState) -> KBManagerState:
                 if attr:
                     attr.value = new_attr["value"]
                     attr.last_updated = datetime.utcnow()
-                kept_new += 1
+                    if new_attr.get("source_doc_id"):
+                        attr.source_doc_id = UUID(new_attr["source_doc_id"])
+                stats["kept_new"] += 1
+                logger.info(f"Updated to new: {new_attr['key']}")
                 
             elif decision == "merge_both":
                 attr = db.query(Attribute).filter(
                     Attribute.id == UUID(existing_attr["id"])
                 ).first()
                 if attr:
-                    attr.value = resolution.get("merged_value", new_attr["value"])
+                    merged_value = resolution.get("merged_value", new_attr["value"])
+                    attr.value = merged_value
                     attr.last_updated = datetime.utcnow()
-                merged += 1
+                    if new_attr.get("source_doc_id"):
+                        attr.source_doc_id = UUID(new_attr["source_doc_id"])
+                stats["merged"] += 1
+                logger.info(f"Merged: {new_attr['key']}")
         
         for new_attr in state["new_attributes"]:
-            if new_attr["key"] not in resolved_new_attrs:
+            key_category_pair = (new_attr["key"].lower(), new_attr["category"])
+            
+            if key_category_pair not in resolved_keys:
                 attr = Attribute(
                     user_id=state["user_id"],
+                    company_id=state["company_id"],
                     key=new_attr["key"],
                     value=new_attr["value"],
                     category=new_attr["category"],
                     source_doc_id=UUID(new_attr["source_doc_id"]) if new_attr.get("source_doc_id") else None
                 )
                 db.add(attr)
-                kept_new += 1
+                stats["new_added"] += 1
+                logger.info(f"Added new: {new_attr['key']}")
         
         db.commit()
         
-        state["stats"] = {
-            "kept_existing": kept_existing,
-            "kept_new": kept_new,
-            "merged": merged,
-            "total_conflicts": len(state["conflicts"]),
-            "new_attributes_added": kept_new
-        }
+        state["stats"] = stats
+        logger.info(f"KB Manager stats: {stats}")
         
+        return state
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving attributes: {str(e)}")
+        state["stats"] = {"error": str(e)}
         return state
         
     finally:
