@@ -7,9 +7,11 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
-RUN pip install uv
-RUN uv pip install --system -r pyproject.toml
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+
+RUN uv pip install --system --no-cache -r pyproject.toml
 
 COPY . .
 
