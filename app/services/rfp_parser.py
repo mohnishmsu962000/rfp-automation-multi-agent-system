@@ -6,7 +6,7 @@ from app.prompts.question_extractor import (
     EXTRACT_QUESTIONS_SYSTEM,
     EXTRACT_QUESTIONS_USER,
 )
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 import pdfplumber
 from docx import Document as DocxDocument
 

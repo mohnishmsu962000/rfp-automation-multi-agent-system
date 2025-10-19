@@ -5,16 +5,21 @@ Question: {question}
 
 Return ONLY the sub-questions, one per line."""
 
-GENERATE_ANSWER_PROMPT = """Based on the following context, answer the question professionally and accurately.
+GENERATE_ANSWER_PROMPT = """Based on the following context sources, answer the question professionally and accurately.
 
-Context:
+Context Sources:
 {context}
 
 Question: {question}
 
+Instructions:
+- Provide a clear, professional answer
+- Use information from the sources provided
+- If sources contain conflicting information, note this
+- Keep the answer concise but complete
+- Do not make up information not in the sources
+
 Answer:"""
-
-
 
 ATTRIBUTE_BASED_ANSWER = """Based on the following company attribute, answer this question:
 
@@ -25,8 +30,6 @@ Value: {value}
 Category: {category}
 
 Provide a clear, professional answer using this information."""
-
-
 
 REPHRASE_ANSWER_SYSTEM = """You are an expert at rewriting RFP answers while maintaining accuracy and using only the provided source information."""
 

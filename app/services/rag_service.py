@@ -6,8 +6,11 @@ from typing import List, Dict
 from rank_bm25 import BM25Okapi
 from app.core.config import get_settings
 from uuid import UUID
+import cohere
+import logging
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 class RAGService:
     @staticmethod
@@ -28,7 +31,7 @@ class RAGService:
             VectorChunk.embedding.cosine_distance(query_embedding).label("distance")
         ).join(Document).filter(
             Document.company_id == company_id
-        ).order_by("distance").limit(top_k * 2).all()
+        ).order_by("distance").limit(top_k * 3).all()
         
         corpus = [chunk.chunk_text for chunk in all_chunks]
         tokenized_corpus = [doc.split() for doc in corpus]
@@ -41,11 +44,12 @@ class RAGService:
             zip(all_chunks, bm25_scores),
             key=lambda x: x[1],
             reverse=True
-        )[:top_k * 2]
+        )[:top_k * 3]
         
         combined_chunks = {}
         for result in vector_results:
             combined_chunks[str(result.id)] = {
+                "id": str(result.id),
                 "text": result.chunk_text,
                 "metadata": result.chunk_metadata,
                 "vector_score": float(1 - result.distance),
@@ -58,22 +62,61 @@ class RAGService:
                 combined_chunks[chunk_id]["bm25_score"] = float(score)
             else:
                 combined_chunks[chunk_id] = {
+                    "id": chunk_id,
                     "text": chunk.chunk_text,
                     "metadata": chunk.chunk_metadata,
                     "vector_score": 0.0,
                     "bm25_score": float(score)
                 }
         
-        combined_list = []
+        hybrid_results = []
         for chunk_id, data in combined_chunks.items():
-            hybrid_score = float(data["vector_score"] + (data["bm25_score"] / 10))
-            data["rerank_score"] = hybrid_score
-            combined_list.append(data)
+            hybrid_score = float(data["vector_score"] * 0.7 + (data["bm25_score"] / 10) * 0.3)
+            data["hybrid_score"] = hybrid_score
+            hybrid_results.append(data)
         
-        final_results = sorted(
-            combined_list,
-            key=lambda x: x["rerank_score"],
+        hybrid_results = sorted(
+            hybrid_results,
+            key=lambda x: x["hybrid_score"],
             reverse=True
-        )[:top_k]
+        )[:top_k * 2]
         
-        return final_results
+        if not hybrid_results:
+            return []
+        
+        try:
+            co = cohere.Client(settings.COHERE_API_KEY)
+            
+            documents = [r["text"] for r in hybrid_results]
+            
+            rerank_response = co.rerank(
+                model="rerank-english-v3.0",
+                query=query,
+                documents=documents,
+                top_n=top_k,
+                return_documents=True
+            )
+            
+            reranked_results = []
+            for result in rerank_response.results:
+                original_data = hybrid_results[result.index]
+                reranked_results.append({
+                    "id": original_data["id"],
+                    "text": original_data["text"],
+                    "metadata": original_data["metadata"],
+                    "vector_score": original_data["vector_score"],
+                    "bm25_score": original_data["bm25_score"],
+                    "hybrid_score": original_data["hybrid_score"],
+                    "rerank_score": float(result.relevance_score)
+                })
+            
+            logger.info(f"Reranked {len(reranked_results)} chunks for query")
+            return reranked_results
+            
+        except Exception as e:
+            logger.error(f"Cohere reranking failed: {str(e)}, using hybrid scores")
+            
+            for r in hybrid_results[:top_k]:
+                r["rerank_score"] = r["hybrid_score"]
+            
+            return hybrid_results[:top_k]
