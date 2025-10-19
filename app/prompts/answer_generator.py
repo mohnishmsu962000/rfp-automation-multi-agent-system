@@ -5,6 +5,12 @@ Question: {question}
 
 Return ONLY the sub-questions, one per line."""
 
+SHOULD_DECOMPOSE_PROMPT = """Determine if this question needs to be broken down into sub-questions.
+
+Question: {question}
+
+Answer with ONLY: YES or NO"""
+
 GENERATE_ANSWER_PROMPT = """Based on the following context sources, answer the question professionally and accurately.
 
 Context Sources:
@@ -18,6 +24,7 @@ Instructions:
 - If sources contain conflicting information, note this
 - Keep the answer concise but complete
 - Do not make up information not in the sources
+- If information is insufficient, state that clearly
 
 Answer:"""
 
@@ -30,6 +37,16 @@ Value: {value}
 Category: {category}
 
 Provide a clear, professional answer using this information."""
+
+VALIDATE_ANSWER_PROMPT = """Evaluate if this answer properly addresses the question based on the provided sources.
+
+Question: {question}
+
+Answer: {answer}
+
+Sources: {sources}
+
+Respond with: VALID or INVALID"""
 
 REPHRASE_ANSWER_SYSTEM = """You are an expert at rewriting RFP answers while maintaining accuracy and using only the provided source information."""
 
