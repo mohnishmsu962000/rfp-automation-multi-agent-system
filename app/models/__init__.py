@@ -1,3 +1,4 @@
+from app.models.company import Company
 from app.models.user import User
 from app.models.document import Document
 from app.models.attribute import Attribute
@@ -7,6 +8,7 @@ from app.models.vector_chunk import VectorChunk
 from app.models.resync_quota import ResyncQuota
 
 __all__ = [
+    "Company",
     "User",
     "Document",
     "Attribute",
