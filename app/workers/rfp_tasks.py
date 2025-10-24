@@ -26,6 +26,7 @@ def process_single_question(question_text: str, rfp_id: str, user_id: str, compa
 @celery_app.task(name="process_rfp")
 def process_rfp_task(rfp_id: str):
     db = SessionLocal()
+    rfp = None 
     
     try:
         rfp = db.query(RFPProject).filter(RFPProject.id == rfp_id).first()
@@ -78,8 +79,9 @@ def process_rfp_task(rfp_id: str):
         return {"status": "completed", "rfp_id": str(rfp_id), "questions_count": len(questions)}
     
     except Exception as e:
-        rfp.status = RFPStatus.FAILED
-        db.commit()
+        if rfp:  # Only set status if rfp exists
+            rfp.status = RFPStatus.FAILED
+            db.commit()
         return {"error": str(e)}
     
     finally:
