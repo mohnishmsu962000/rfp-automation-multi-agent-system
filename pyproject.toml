@@ -12,7 +12,6 @@ dependencies = [
     "cohere>=5.18.0",
     "fastapi>=0.119.0",
     "httpx>=0.28.1",
-    "langchain>=0.3.27",
     "langchain-anthropic>=0.3.22",
     "langchain-core>=0.3.79",
     "langchain-google-genai>=2.1.12",
