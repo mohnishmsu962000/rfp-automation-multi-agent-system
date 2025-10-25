@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import documents, rfps, attributes, auth
 from app.core.config import get_settings
 from app.core.database import Base, engine
+from app.api.routes import documents, rfps, attributes, auth, users
 
 settings = get_settings()
 
@@ -25,6 +26,7 @@ app.include_router(documents.router)
 app.include_router(rfps.router)
 app.include_router(attributes.router)
 app.include_router(auth.router)
+app.include_router(users.router)
 
 @app.get("/health")
 def health_check():
