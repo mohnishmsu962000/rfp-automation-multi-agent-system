@@ -170,32 +170,35 @@ def _calculate_attribute_trust_score(top_similarity: float, all_results: list) -
 
 
 def _calculate_rag_trust_score(results: list, validation_score: float, answer: str, question: str) -> float:
-    
     if not results:
         return 0.0
     
     try:
         from app.services.llm_factory import LLMFactory
-        from app.prompts.answer_generator import SCORE_ANSWER_QUALITY_PROMPT
+        from app.prompts.answer_generator import SCORE_ANSWER_SYSTEM_PROMPT, SCORE_ANSWER_USER_PROMPT
         from langchain_core.messages import SystemMessage, HumanMessage
         
-        llm = LLMFactory.get_llm("claude-haiku-4")
+        llm = LLMFactory.get_llm("claude-sonnet") 
         
-        prompt = SCORE_ANSWER_QUALITY_PROMPT.format(
+        source_type = "RAG + Documents"
+        num_sources = len(results)
+        top_relevance = f"{results[0].get('rerank_score', 0):.2f}" if results else "0.00"
+        
+        prompt = SCORE_ANSWER_USER_PROMPT.format(
             question=question,
-            answer=answer[:1500]  
+            answer=answer[:2000],
+            source_type=source_type,
+            num_sources=num_sources,
+            top_relevance=top_relevance
         )
         
         response = llm.invoke([
-            SystemMessage(content="You are an expert RFP evaluator. Respond only with a number."),
+            SystemMessage(content=SCORE_ANSWER_SYSTEM_PROMPT),
             HumanMessage(content=prompt)
         ])
         
-        
         score_text = response.content.strip()
         score = float(score_text)
-        
-       
         score = min(max(score, 0), 100)
         
         logger.info(f"LLM trust score: {score}")
@@ -204,7 +207,6 @@ def _calculate_rag_trust_score(results: list, validation_score: float, answer: s
     except Exception as e:
         logger.error(f"LLM scoring failed: {str(e)}, falling back to retrieval-based")
         
-       
         top_score = results[0].get("rerank_score", 0)
         avg_top_3 = sum(r.get("rerank_score", 0) for r in results[:3]) / min(3, len(results))
         num_sources = len(results)
