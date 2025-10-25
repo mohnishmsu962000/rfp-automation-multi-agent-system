@@ -96,3 +96,19 @@ Requirements:
 - Preserve all key metrics and facts
 
 Provide the rewritten answer:"""
+
+
+SCORE_ANSWER_QUALITY_PROMPT = """Evaluate this RFP answer quality. Score 0-100.
+
+Question: {question}
+
+Answer: {answer}
+
+Criteria:
+- 90-100: Complete, professional, well-sourced, client-ready
+- 75-89: Good answer, addresses question, minor gaps okay  
+- 60-74: Adequate but incomplete or needs polish
+- 40-59: Significant gaps or quality issues
+- 0-39: Poor quality, doesn't answer, or unsupported
+
+Respond with ONLY a number 0-100. No explanation."""

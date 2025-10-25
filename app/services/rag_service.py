@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class RAGService:
     @staticmethod
-    def search_similar_chunks(query: str, db: Session, company_id: UUID, top_k: int = 5) -> List[Dict]:
+    def search_similar_chunks(query: str, db: Session, company_id: UUID, top_k: int = 8) -> List[Dict]:
         try:
             logger.info(f"RAG search called with company_id: {company_id}, query: {query[:100]}")
             

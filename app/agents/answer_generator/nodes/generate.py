@@ -43,7 +43,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     question = state["question"]
     rag_results = state["rag_results"]
     
-    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.15):
+    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.1):
         state["answer"] = "Based on the available information in our knowledge base, we do not have sufficient details to answer this question comprehensively. Please provide additional context or documentation."
         state["trust_score"] = 0.0
         state["source_type"] = "none"
@@ -52,7 +52,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     
     deduplicated_results = _deduplicate_chunks(rag_results)
     
-    packed_context = _pack_context_smart(deduplicated_results, max_tokens=3000)
+    packed_context = _pack_context_smart(deduplicated_results, max_tokens=5000)
     
     context = "\n\n".join([f"[Source {i+1}]\n{c['text']}" for i, c in enumerate(packed_context)])
     
@@ -70,7 +70,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     if not is_valid:
         answer = f"{answer}\n\n*Note: This answer may be incomplete. Please verify with additional sources.*"
     
-    trust_score = _calculate_rag_trust_score(packed_context, validation_score)
+    trust_score = _calculate_rag_trust_score(packed_context, validation_score, answer, question)
     
     state["answer"] = answer
     state["trust_score"] = trust_score
@@ -169,19 +169,49 @@ def _calculate_attribute_trust_score(top_similarity: float, all_results: list) -
     return round(base_score, 2)
 
 
-def _calculate_rag_trust_score(results: list, validation_score: float) -> float:
+def _calculate_rag_trust_score(results: list, validation_score: float, answer: str, question: str) -> float:
+    
     if not results:
         return 0.0
     
-    top_score = results[0].get("rerank_score", 0)
-    avg_top_3 = sum(r.get("rerank_score", 0) for r in results[:3]) / min(3, len(results))
-    num_sources = len(results)
-    
-    base_score = min(top_score * 90, 75)    
-    consistency_bonus = avg_top_3 * 15        
-    source_bonus = min(num_sources * 2, 10)   
-    
-    trust_score = base_score + consistency_bonus + source_bonus
-    trust_score = min(trust_score, 100)
-    
-    return round(trust_score, 2)
+    try:
+        from app.services.llm_factory import LLMFactory
+        from app.prompts.answer_generator import SCORE_ANSWER_QUALITY_PROMPT
+        from langchain_core.messages import SystemMessage, HumanMessage
+        
+        llm = LLMFactory.get_llm("claude-haiku-4")
+        
+        prompt = SCORE_ANSWER_QUALITY_PROMPT.format(
+            question=question,
+            answer=answer[:1500]  
+        )
+        
+        response = llm.invoke([
+            SystemMessage(content="You are an expert RFP evaluator. Respond only with a number."),
+            HumanMessage(content=prompt)
+        ])
+        
+        
+        score_text = response.content.strip()
+        score = float(score_text)
+        
+       
+        score = min(max(score, 0), 100)
+        
+        logger.info(f"LLM trust score: {score}")
+        return round(score, 2)
+        
+    except Exception as e:
+        logger.error(f"LLM scoring failed: {str(e)}, falling back to retrieval-based")
+        
+       
+        top_score = results[0].get("rerank_score", 0)
+        avg_top_3 = sum(r.get("rerank_score", 0) for r in results[:3]) / min(3, len(results))
+        num_sources = len(results)
+        
+        base_score = min(top_score * 100, 80)
+        consistency_bonus = avg_top_3 * 18
+        source_bonus = min(num_sources * 3, 12)
+        
+        trust_score = base_score + consistency_bonus + source_bonus
+        return round(min(trust_score, 100), 2)
