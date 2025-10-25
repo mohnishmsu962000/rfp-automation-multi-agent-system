@@ -1,6 +1,6 @@
 from app.services.llm_factory import LLMFactory
 from app.agents.answer_generator.state import AnswerGeneratorState
-from app.prompts.answer_generator import GENERATE_ANSWER_PROMPT, ATTRIBUTE_BASED_ANSWER, VALIDATE_ANSWER_PROMPT, SYSTEM_PROMPT
+from app.prompts.answer_generator import GENERATE_ANSWER_PROMPT, ATTRIBUTE_BASED_ANSWER, SYSTEM_PROMPT
 from langchain_core.messages import SystemMessage, HumanMessage
 import logging
 import tiktoken
@@ -22,7 +22,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
         )
         
         response = llm.invoke([
-            SystemMessage(content=SYSTEM_PROMPT),
+            SystemMessage(content=SYSTEM_PROMPT), 
             HumanMessage(content=prompt)
         ])
         
@@ -43,7 +43,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     question = state["question"]
     rag_results = state["rag_results"]
     
-    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.2):
+    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.15):
         state["answer"] = "Based on the available information in our knowledge base, we do not have sufficient details to answer this question comprehensively. Please provide additional context or documentation."
         state["trust_score"] = 0.0
         state["source_type"] = "none"
@@ -173,22 +173,15 @@ def _calculate_rag_trust_score(results: list, validation_score: float) -> float:
     if not results:
         return 0.0
     
-    top_rerank_score = results[0].get("rerank_score", 0)
-    
+    top_score = results[0].get("rerank_score", 0)
+    avg_top_3 = sum(r.get("rerank_score", 0) for r in results[:3]) / min(3, len(results))
     num_sources = len(results)
     
-    avg_rerank = sum(r.get("rerank_score", 0) for r in results[:3]) / min(3, len(results))
+    base_score = min(top_score * 90, 75)    
+    consistency_bonus = avg_top_3 * 15        
+    source_bonus = min(num_sources * 2, 10)   
     
-    base_score = top_rerank_score * 60
-    
-    source_bonus = min(num_sources * 2, 10)
-    
-    consistency_bonus = avg_rerank * 10
-    
-    validation_bonus = validation_score * 20
-    
-    trust_score = base_score + source_bonus + consistency_bonus + validation_bonus
-    
-    trust_score = min(max(trust_score, 0), 100)
+    trust_score = base_score + consistency_bonus + source_bonus
+    trust_score = min(trust_score, 100)
     
     return round(trust_score, 2)
