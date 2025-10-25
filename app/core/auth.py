@@ -6,6 +6,7 @@ from app.models.user_company import UserCompany
 import jwt
 from jwt import PyJWKClient
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -37,11 +38,21 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         
         db = SessionLocal()
         try:
-            db.expire_all()
+            max_retries = 3
+            user_company = None
             
-            user_company = db.query(UserCompany).filter(
-                UserCompany.user_id == user_id
-            ).first()
+            for attempt in range(max_retries):
+                user_company = db.query(UserCompany).filter(
+                    UserCompany.user_id == user_id
+                ).first()
+                
+                if user_company:
+                    break
+                
+                if attempt < max_retries - 1:
+                    logger.info(f"Retry {attempt + 1}/{max_retries} for user {user_id}")
+                    time.sleep(0.1)
+                    db.expire_all()
             
             if not user_company:
                 logger.warning(f"No company found for user: {user_id}")
