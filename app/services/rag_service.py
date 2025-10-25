@@ -17,29 +17,37 @@ logger = logging.getLogger(__name__)
 class RAGService:
     @staticmethod
     def search_similar_chunks(query: str, db: Session, company_id: UUID, top_k: int = 5) -> List[Dict]:
+        logger.info(f"RAG search called with company_id: {company_id}, query: {query[:100]}")
+        
         all_chunks = db.query(VectorChunk).join(Document).filter(
             Document.company_id == company_id
         ).all()
+        
+        logger.info(f"Found {len(all_chunks)} chunks in database for company {company_id}")
         
         if not all_chunks:
             logger.warning(f"No chunks found for company {company_id}")
             return []
         
-        logger.info(f"Found {len(all_chunks)} total chunks for company {company_id}")
-        
         query_embedding = EmbeddingService.generate_embedding(query)
+        logger.info(f"Generated query embedding, length: {len(query_embedding)}")
         
         def cosine_similarity(a, b):
             return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
         
         vector_scores = []
         for chunk in all_chunks:
+            if chunk.embedding is None:
+                logger.warning(f"Chunk {chunk.id} has NULL embedding, skipping")
+                continue
             similarity = cosine_similarity(query_embedding, chunk.embedding)
             vector_scores.append((chunk, float(similarity)))
         
+        logger.info(f"Calculated similarities for {len(vector_scores)} chunks")
+        
         vector_results = sorted(vector_scores, key=lambda x: x[1], reverse=True)[:top_k * 3]
         
-        logger.info(f"Vector search returned {len(vector_results)} results")
+        logger.info(f"Vector search returned {len(vector_results)} results, top score: {vector_results[0][1] if vector_results else 0}")
         
         corpus = [chunk.chunk_text for chunk in all_chunks]
         tokenized_corpus = [doc.split() for doc in corpus]
@@ -92,6 +100,7 @@ class RAGService:
         logger.info(f"Hybrid search returned {len(hybrid_results)} results")
         
         if not hybrid_results:
+            logger.warning("No hybrid results after combining vector and BM25")
             return []
         
         try:
@@ -120,7 +129,7 @@ class RAGService:
                     "rerank_score": float(result.relevance_score)
                 })
             
-            logger.info(f"Reranked {len(reranked_results)} chunks for query")
+            logger.info(f"Reranked {len(reranked_results)} chunks, top rerank score: {reranked_results[0]['rerank_score'] if reranked_results else 0}")
             return reranked_results
             
         except Exception as e:
