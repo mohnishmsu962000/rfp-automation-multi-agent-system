@@ -52,7 +52,10 @@ async def update_user(
         )
         
         user_id = decoded.get("sub")
-        logger.info(f"User ID from token: {user_id}")
+        email = decoded.get("email", "")
+        name = decoded.get("name", decoded.get("email", "").split("@")[0])
+        
+        logger.info(f"User ID: {user_id}, Email: {email}, Name: {name}")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -60,7 +63,11 @@ async def update_user(
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             logger.info(f"Creating new user: {user_id}")
-            user = User(id=user_id)
+            user = User(
+                id=user_id,
+                email=email,
+                name=name
+            )
             db.add(user)
             db.commit()
         
