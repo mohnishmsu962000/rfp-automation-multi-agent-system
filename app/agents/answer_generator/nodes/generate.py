@@ -1,6 +1,6 @@
 from app.services.llm_factory import LLMFactory
 from app.agents.answer_generator.state import AnswerGeneratorState
-from app.prompts.answer_generator import GENERATE_ANSWER_PROMPT, ATTRIBUTE_BASED_ANSWER, VALIDATE_ANSWER_PROMPT
+from app.prompts.answer_generator import GENERATE_ANSWER_PROMPT, ATTRIBUTE_BASED_ANSWER, VALIDATE_ANSWER_PROMPT, SYSTEM_PROMPT
 from langchain_core.messages import SystemMessage, HumanMessage
 import logging
 import tiktoken
@@ -21,7 +21,10 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
             category=top_attr["category"]
         )
         
-        response = llm.invoke(prompt)
+        response = llm.invoke([
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=prompt)
+        ])
         
         trust_score = _calculate_attribute_trust_score(top_attr["similarity"], attribute_results)
         
@@ -40,7 +43,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     question = state["question"]
     rag_results = state["rag_results"]
     
-    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.3):
+    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.2):
         state["answer"] = "Based on the available information in our knowledge base, we do not have sufficient details to answer this question comprehensively. Please provide additional context or documentation."
         state["trust_score"] = 0.0
         state["source_type"] = "none"
@@ -54,14 +57,18 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     context = "\n\n".join([f"[Source {i+1}]\n{c['text']}" for i, c in enumerate(packed_context)])
     
     prompt = GENERATE_ANSWER_PROMPT.format(context=context, question=question)
-    response = llm.invoke(prompt)
+    
+    response = llm.invoke([
+        SystemMessage(content=SYSTEM_PROMPT),
+        HumanMessage(content=prompt)
+    ])
     
     answer = response.content
     
     is_valid, validation_score = _validate_answer(answer, question, packed_context)
     
     if not is_valid:
-        answer = f"{answer}\n\nNote: This answer may be incomplete. Please verify with additional sources."
+        answer = f"{answer}\n\n*Note: This answer may be incomplete. Please verify with additional sources.*"
     
     trust_score = _calculate_rag_trust_score(packed_context, validation_score)
     

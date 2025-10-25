@@ -1,3 +1,5 @@
+SYSTEM_PROMPT = """You are an expert RFP (Request for Proposal) response writer for enterprise software companies. You write clear, professional, and compelling answers that win contracts. Your responses are accurate, well-structured, and based strictly on provided information."""
+
 DECOMPOSE_QUERY_PROMPT = """Break this RFP question into simple sub-questions that can be answered independently.
 If the question is already simple, return just the original question.
 
@@ -11,34 +13,50 @@ Question: {question}
 
 Answer with ONLY: YES or NO"""
 
-GENERATE_ANSWER_PROMPT = """Based on the following context sources, answer the question professionally and accurately.
+GENERATE_ANSWER_PROMPT = """You are writing a professional RFP response for an enterprise software company. Generate a polished, executive-ready answer using ONLY the provided context.
 
 Context Sources:
 {context}
 
 Question: {question}
 
-Instructions:
-- Provide a clear, professional answer
-- Use information from the sources provided
-- If sources contain conflicting information, note this
-- Keep the answer concise but complete
-- Do not make up information not in the sources
-- If information is insufficient, state that clearly
+Requirements:
+- Write in a confident, professional tone suitable for Fortune 500 clients
+- Structure with clear sections using ## headings for complex answers
+- Use bullet points (starting with -) for lists of features, capabilities, or specifications
+- Use **bold** for key metrics, numbers, certifications, and critical information
+- Keep paragraphs concise (2-3 sentences maximum)
+- Lead with the most important information first
+- Use specific numbers, percentages, and metrics from the context
+- If information is partially missing, provide what's available and note gaps professionally
+- Do not fabricate information not in the sources
 
-Answer:"""
+Formatting Guidelines:
+- Main sections: ## Section Name
+- Sub-sections: ### Subsection Name
+- Key metrics: **99.99% uptime**, **$2.16M savings**, **SOC 2 Type II certified**
+- Lists: Use - for bullet points with parallel structure
+- Notes: Use *italics* for clarifications or caveats
 
-ATTRIBUTE_BASED_ANSWER = """Based on the following company attribute, answer this question:
+Generate the response:"""
+
+ATTRIBUTE_BASED_ANSWER = """You are writing a professional RFP response. Answer this question directly and professionally using the provided company attribute.
 
 Question: {question}
 
-Attribute: {key}
-Value: {value}
-Category: {category}
+Company Information:
+- **{key}**: {value}
+- Category: {category}
 
-Provide a clear, professional answer using this information."""
+Requirements:
+- Answer directly in 1-3 sentences
+- Use **bold** for the key metric or fact
+- Be confident and professional
+- If the attribute doesn't fully answer the question, state what information is available
 
-VALIDATE_ANSWER_PROMPT = """Evaluate if this answer properly addresses the question based on the provided sources.
+Generate the response:"""
+
+VALIDATE_ANSWER_PROMPT = """Evaluate if this RFP answer properly addresses the question and is supported by the sources.
 
 Question: {question}
 
@@ -46,11 +64,17 @@ Answer: {answer}
 
 Sources: {sources}
 
-Respond with: VALID or INVALID"""
+Check:
+1. Does the answer directly address the question?
+2. Is all information supported by the sources?
+3. Is it professionally written?
+4. Are there any hallucinations or unsupported claims?
 
-REPHRASE_ANSWER_SYSTEM = """You are an expert at rewriting RFP answers while maintaining accuracy and using only the provided source information."""
+Respond with ONLY: VALID or INVALID"""
 
-REPHRASE_ANSWER_USER = """Rewrite this RFP answer based on the user's instruction.
+REPHRASE_ANSWER_SYSTEM = """You are an expert at rewriting RFP answers to match specific tones and styles while maintaining complete accuracy. You only use information from provided sources and never fabricate details."""
+
+REPHRASE_ANSWER_USER = """Rewrite this RFP answer based on the user's instruction while maintaining accuracy.
 
 **Original Question:**
 {question}
@@ -61,13 +85,14 @@ REPHRASE_ANSWER_USER = """Rewrite this RFP answer based on the user's instructio
 **Source Information:**
 {sources}
 
-**User Instruction:**
+**User's Rewriting Instruction:**
 {instruction}
 
-Important:
-- Only use information from the sources provided
-- Follow the user's instruction for tone/style
-- Maintain accuracy and completeness
-- Keep it professional
+Requirements:
+- Follow the user's instruction for tone, length, or style changes
+- Use ONLY information from the sources - never add new facts
+- Maintain professional quality
+- Keep formatting clean with markdown (##, **, -, etc.)
+- Preserve all key metrics and facts
 
 Provide the rewritten answer:"""
