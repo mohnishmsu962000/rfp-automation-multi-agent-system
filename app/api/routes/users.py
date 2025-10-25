@@ -52,8 +52,8 @@ async def update_user(
         )
         
         user_id = decoded.get("sub")
-        email = decoded.get("email", "")
-        name = decoded.get("name", decoded.get("email", "").split("@")[0])
+        email = decoded.get("email") or decoded.get("primary_email_address_id") or f"{user_id}@temp.local"
+        name = decoded.get("name") or decoded.get("first_name", "") + " " + decoded.get("last_name", "") or email.split("@")[0]
         
         logger.info(f"User ID: {user_id}, Email: {email}, Name: {name}")
         
@@ -65,8 +65,8 @@ async def update_user(
             logger.info(f"Creating new user: {user_id}")
             user = User(
                 id=user_id,
-                email=email,
-                name=name
+                email=email.strip(),
+                name=name.strip()
             )
             db.add(user)
             db.commit()
