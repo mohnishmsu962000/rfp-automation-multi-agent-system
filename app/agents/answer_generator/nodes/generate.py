@@ -43,7 +43,7 @@ def generate_answer_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     question = state["question"]
     rag_results = state["rag_results"]
     
-    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.1):
+    if not rag_results or (rag_results and rag_results[0].get("rerank_score", 0) < 0.05):
         state["answer"] = "Based on the available information in our knowledge base, we do not have sufficient details to answer this question comprehensively. Please provide additional context or documentation."
         state["trust_score"] = 0.0
         state["source_type"] = "none"

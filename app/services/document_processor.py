@@ -45,6 +45,7 @@ class DocumentProcessor:
                 for page_num, page in enumerate(pdf.pages):
                     page_text = page.extract_text()
                     if page_text:
+                        page_text = page_text.replace('\x00', '')
                         text += f"\n--- Page {page_num + 1} ---\n"
                         text += page_text
                     
