@@ -18,12 +18,10 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     
     try:
         jwks_url = "https://helping-grizzly-76.clerk.accounts.dev/.well-known/jwks.json"
-        logger.info(f"Fetching JWKS from: {jwks_url}")
         
         jwks_client = PyJWKClient(jwks_url)
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         
-        logger.info("Decoding JWT token...")
         decoded = jwt.decode(
             token,
             signing_key.key,
@@ -32,19 +30,24 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         )
         
         user_id = decoded.get("sub")
-        logger.info(f"User ID from token: {user_id}")
+        logger.info(f"Checking user company for user_id: {user_id}")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
         
         db = SessionLocal()
         try:
+            db.expire_all()
+            
             user_company = db.query(UserCompany).filter(
                 UserCompany.user_id == user_id
             ).first()
             
             if not user_company:
+                logger.warning(f"No company found for user: {user_id}")
                 raise HTTPException(status_code=403, detail="User not associated with any company")
+            
+            logger.info(f"Found company {user_company.company_id} for user {user_id}")
             
             return {
                 "user_id": user_id,
