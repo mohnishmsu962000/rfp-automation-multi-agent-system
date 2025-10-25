@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from app.core.database import SessionLocal
 from app.models.company import Company
@@ -7,7 +7,9 @@ from app.models.user import User
 from app.api.routes.auth import get_current_user
 from sqlalchemy.orm import Session
 import uuid
-from fastapi import Header
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -27,13 +29,14 @@ async def update_user(
     authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing authorization")
-    
-    token = authorization.replace("Bearer ", "")
-    
     try:
+        logger.info(f"Received company name update request: {request.company_name}")
+        
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing authorization")
+        
+        token = authorization.replace("Bearer ", "")
+        
         from jwt import PyJWKClient
         import jwt
         
@@ -49,13 +52,14 @@ async def update_user(
         )
         
         user_id = decoded.get("sub")
+        logger.info(f"User ID from token: {user_id}")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
         
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            # Create user
+            logger.info(f"Creating new user: {user_id}")
             user = User(id=user_id)
             db.add(user)
             db.commit()
@@ -65,9 +69,11 @@ async def update_user(
         ).first()
         
         if user_company:
+            logger.info(f"Updating existing company: {user_company.company_id}")
             company = db.query(Company).filter(Company.id == user_company.company_id).first()
             company.name = request.company_name
         else:
+            logger.info("Creating new company")
             company = Company(
                 id=uuid.uuid4(),
                 name=request.company_name
@@ -82,6 +88,7 @@ async def update_user(
             db.add(user_company)
         
         db.commit()
+        logger.info("Company saved successfully")
         
         return {
             "message": "Company created successfully",
@@ -89,7 +96,10 @@ async def update_user(
             "company_id": str(company.id)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error in update_user: {str(e)}", exc_info=True)
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -98,7 +108,6 @@ async def get_user(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get current user and company info"""
     company_id = current_user["company_id"]
     
     company = db.query(Company).filter(Company.id == company_id).first()
