@@ -27,13 +27,14 @@ def decompose_query_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
 
 
 def _check_if_decompose_needed(question: str) -> bool:
-    if len(question.split()) < 15:
-        return False
-    
-    multi_part_indicators = [
-        " and ", " or ", "a)", "b)", "c)", "1)", "2)", "3)",
-        "describe both", "explain each", "list all", "provide details on"
-    ]
-    
-    question_lower = question.lower()
-    return any(indicator in question_lower for indicator in multi_part_indicators)
+    """Use LLM to determine if decomposition is needed"""
+    try:
+        llm = LLMFactory.get_llm("gpt-4o-mini")
+        prompt = SHOULD_DECOMPOSE_PROMPT.format(question=question)
+        
+        response = llm.invoke(prompt)
+        answer = response.content.strip().upper()
+        
+        return "YES" in answer
+    except Exception as e:
+        return len(question.split()) > 30 and ("?" in question[:-1])
