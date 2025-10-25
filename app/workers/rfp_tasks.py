@@ -47,7 +47,7 @@ def process_rfp_task(rfp_id: str):
         os.unlink(tmp_path)
         
         results = []
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {executor.submit(process_single_question, q, str(rfp.id), str(rfp.user_id), str(rfp.company_id)): q for q in questions}
             for future in as_completed(futures):
                 try:
