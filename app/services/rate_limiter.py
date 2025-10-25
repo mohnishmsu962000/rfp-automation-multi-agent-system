@@ -12,7 +12,28 @@ RATE_LIMITS = {
     "resync": 2
 }
 
+MAX_FILE_SIZE = 10 * 1024 * 1024
+MAX_DOCUMENT_PAGES = 100
+MAX_DOCUMENT_TOKENS = 50000
+
 class RateLimiter:
+    
+    @staticmethod
+    def validate_file_size(file_size: int) -> tuple[bool, str]:
+        if file_size > MAX_FILE_SIZE:
+            return False, f"File too large. Maximum size is {MAX_FILE_SIZE / (1024*1024):.0f}MB"
+        return True, ""
+    
+    @staticmethod
+    def validate_document_content(text: str, page_count: int = None) -> tuple[bool, str]:
+        if page_count and page_count > MAX_DOCUMENT_PAGES:
+            return False, f"Document too long. Maximum {MAX_DOCUMENT_PAGES} pages allowed"
+        
+        token_count = len(text.split())
+        if token_count > MAX_DOCUMENT_TOKENS:
+            return False, f"Document too large. Maximum {MAX_DOCUMENT_TOKENS} words allowed"
+        
+        return True, ""
     
     @staticmethod
     def check_document_quota(company_id: UUID, db: Session) -> tuple[bool, int, int]:

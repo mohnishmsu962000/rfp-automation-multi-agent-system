@@ -37,15 +37,19 @@ async def upload_document(
     user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
-    allowed, used, remaining = RateLimiter.check_document_quota(company_id, db)
+    file_content = await file.read()
     
+    is_valid_size, size_error = RateLimiter.validate_file_size(len(file_content))
+    if not is_valid_size:
+        raise APIError(status_code=400, message=size_error)
+    
+    allowed, used, remaining = RateLimiter.check_document_quota(company_id, db)
     if not allowed:
         raise APIError(
             status_code=429,
             message=f"Document upload limit reached. You have uploaded {used}/100 documents (lifetime limit)."
         )
     
-    file_content = await file.read()
     file_url = StorageService.upload_file(file_content, file.filename)
     
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]

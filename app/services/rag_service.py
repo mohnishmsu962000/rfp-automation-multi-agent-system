@@ -20,18 +20,22 @@ class RAGService:
         ).all()
         
         if not all_chunks:
+            logger.warning(f"No chunks found for company {company_id}")
             return []
+        
+        logger.info(f"Found {len(all_chunks)} total chunks for company {company_id}")
         
         query_embedding = EmbeddingService.generate_embedding(query)
         
         vector_results = db.query(
-            VectorChunk.id,
-            VectorChunk.chunk_text,
-            VectorChunk.chunk_metadata,
-            VectorChunk.embedding.cosine_distance(query_embedding).label("distance")
+            VectorChunk
         ).join(Document).filter(
             Document.company_id == company_id
-        ).order_by("distance").limit(top_k * 3).all()
+        ).order_by(
+            VectorChunk.embedding.cosine_distance(query_embedding)
+        ).limit(top_k * 3).all()
+        
+        logger.info(f"Vector search returned {len(vector_results)} results")
         
         corpus = [chunk.chunk_text for chunk in all_chunks]
         tokenized_corpus = [doc.split() for doc in corpus]
@@ -47,12 +51,13 @@ class RAGService:
         )[:top_k * 3]
         
         combined_chunks = {}
-        for result in vector_results:
-            combined_chunks[str(result.id)] = {
-                "id": str(result.id),
-                "text": result.chunk_text,
-                "metadata": result.chunk_metadata,
-                "vector_score": float(1 - result.distance),
+        for chunk in vector_results:
+            distance = float(VectorChunk.embedding.cosine_distance(query_embedding))
+            combined_chunks[str(chunk.id)] = {
+                "id": str(chunk.id),
+                "text": chunk.chunk_text,
+                "metadata": chunk.chunk_metadata,
+                "vector_score": float(1 - distance) if distance < 1 else 0.5,
                 "bm25_score": 0.0
             }
         
@@ -80,6 +85,8 @@ class RAGService:
             key=lambda x: x["hybrid_score"],
             reverse=True
         )[:top_k * 2]
+        
+        logger.info(f"Hybrid search returned {len(hybrid_results)} results")
         
         if not hybrid_results:
             return []
