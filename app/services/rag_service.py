@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models.vector_chunk import VectorChunk
 from app.models.document import Document
 from app.services.embedding_service import EmbeddingService
@@ -8,6 +9,7 @@ from app.core.config import get_settings
 from uuid import UUID
 import cohere
 import logging
+import numpy as np
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -27,13 +29,15 @@ class RAGService:
         
         query_embedding = EmbeddingService.generate_embedding(query)
         
-        vector_results = db.query(
-            VectorChunk
-        ).join(Document).filter(
-            Document.company_id == company_id
-        ).order_by(
-            VectorChunk.embedding.cosine_distance(query_embedding)
-        ).limit(top_k * 3).all()
+        def cosine_similarity(a, b):
+            return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        
+        vector_scores = []
+        for chunk in all_chunks:
+            similarity = cosine_similarity(query_embedding, chunk.embedding)
+            vector_scores.append((chunk, float(similarity)))
+        
+        vector_results = sorted(vector_scores, key=lambda x: x[1], reverse=True)[:top_k * 3]
         
         logger.info(f"Vector search returned {len(vector_results)} results")
         
@@ -51,13 +55,12 @@ class RAGService:
         )[:top_k * 3]
         
         combined_chunks = {}
-        for chunk in vector_results:
-            distance = float(VectorChunk.embedding.cosine_distance(query_embedding))
+        for chunk, score in vector_results:
             combined_chunks[str(chunk.id)] = {
                 "id": str(chunk.id),
                 "text": chunk.chunk_text,
                 "metadata": chunk.chunk_metadata,
-                "vector_score": float(1 - distance) if distance < 1 else 0.5,
+                "vector_score": float(score),
                 "bm25_score": 0.0
             }
         

@@ -7,10 +7,21 @@ from app.agents.answer_generator import generate_answer_for_question
 import httpx
 import tempfile
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import UUID
-import logging
 
-logger = logging.getLogger(__name__)
+def process_single_question(question_text: str, rfp_id: str, user_id: str, company_id: str):
+    db = SessionLocal()
+    try:
+        answer_result = generate_answer_for_question(question_text, db, user_id, UUID(company_id))
+        return {
+            "question": question_text,
+            "answer": answer_result["answer"],
+            "trust_score": float(answer_result["trust_score"]),
+            "source_type": answer_result.get("source_type", "rag")
+        }
+    finally:
+        db.close()
 
 @celery_app.task(name="process_rfp")
 def process_rfp_task(rfp_id: str):
@@ -35,44 +46,32 @@ def process_rfp_task(rfp_id: str):
         questions = RFPParser.extract_questions(tmp_path, filename)
         os.unlink(tmp_path)
         
-        logger.info(f"Processing {len(questions)} questions sequentially")
+        results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(process_single_question, q, str(rfp.id), str(rfp.user_id), str(rfp.company_id)): q for q in questions}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    question = futures[future]
+                    results.append({
+                        "question": question,
+                        "answer": f"Error generating answer: {str(e)}",
+                        "trust_score": 0.0,
+                        "source_type": "error"
+                    })
         
-        for i, question_text in enumerate(questions):
-            try:
-                logger.info(f"Processing question {i+1}/{len(questions)}: {question_text[:100]}")
-                
-                answer_result = generate_answer_for_question(
-                    question_text, 
-                    db, 
-                    str(rfp.user_id), 
-                    UUID(str(rfp.company_id))
-                )
-                
-                rfp_question = RFPQuestion(
-                    project_id=rfp.id,
-                    question_text=question_text,
-                    answer_text=answer_result["answer"],
-                    trust_score=float(answer_result["trust_score"]),
-                    source_type=answer_result.get("source_type", "rag"),
-                    user_edited=False
-                )
-                db.add(rfp_question)
-                db.commit()
-                
-                logger.info(f"Question {i+1} processed successfully")
-                
-            except Exception as e:
-                logger.error(f"Error processing question {i+1}: {str(e)}")
-                rfp_question = RFPQuestion(
-                    project_id=rfp.id,
-                    question_text=question_text,
-                    answer_text=f"Error generating answer: {str(e)}",
-                    trust_score=0.0,
-                    source_type="error",
-                    user_edited=False
-                )
-                db.add(rfp_question)
-                db.commit()
+        for result in results:
+            rfp_question = RFPQuestion(
+                project_id=rfp.id,
+                question_text=result["question"],
+                answer_text=result["answer"],
+                trust_score=result["trust_score"],
+                source_type=result.get("source_type", "rag"),
+                user_edited=False
+            )
+            db.add(rfp_question)
         
         rfp.status = RFPStatus.COMPLETED
         db.commit()
@@ -80,7 +79,6 @@ def process_rfp_task(rfp_id: str):
         return {"status": "completed", "rfp_id": str(rfp_id), "questions_count": len(questions)}
     
     except Exception as e:
-        logger.error(f"RFP processing failed: {str(e)}")
         if rfp:
             rfp.status = RFPStatus.FAILED
             db.commit()
