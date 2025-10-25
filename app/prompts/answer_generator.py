@@ -98,17 +98,20 @@ Requirements:
 Provide the rewritten answer:"""
 
 
-SCORE_ANSWER_QUALITY_PROMPT = """Evaluate this RFP answer quality. Score 0-100.
+SCORE_ANSWER_QUALITY_PROMPT = """Score this RFP answer based on how well it answers the question. Rate 0-100.
 
 Question: {question}
 
 Answer: {answer}
 
-Criteria:
-- 90-100: Complete, professional, well-sourced, client-ready
-- 75-89: Good answer, addresses question, minor gaps okay  
-- 60-74: Adequate but incomplete or needs polish
-- 40-59: Significant gaps or quality issues
-- 0-39: Poor quality, doesn't answer, or unsupported
+Scoring Guidelines:
+- 90-100: Fully answers the question with specific details and facts
+- 70-89: Answers most of the question, minor details missing
+- 50-69: Partially answers, significant information missing
+- 30-49: Minimal relevant information provided
+- 0-29: Does not answer the question or completely wrong
 
-Respond with ONLY a number 0-100. No explanation."""
+IMPORTANT: Score based on information completeness, NOT writing style or polish.
+If the answer provides the requested facts and details, score 90+.
+
+Respond with ONLY a number 0-100."""
