@@ -330,9 +330,12 @@ requests==2.32.5
     #   langsmith
     #   razorpay
     #   requests-toolbelt
+    #   resend
     #   tiktoken
 requests-toolbelt==1.0.0
     # via langsmith
+resend==2.17.0
+    # via rfp-backend (pyproject.toml)
 rsa==4.9.1
     # via google-auth
 six==1.17.0
@@ -390,6 +393,7 @@ typing-extensions==4.15.0
     #   python-docx
     #   python-pptx
     #   realtime
+    #   resend
     #   sqlalchemy
     #   starlette
     #   typing-inspection
