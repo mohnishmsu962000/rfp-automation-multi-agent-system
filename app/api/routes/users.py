@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 
 class UpdateUserRequest(BaseModel):
     company_name: str
+    clerk_organization_id: str
 
 def get_db():
     db = SessionLocal()
@@ -79,18 +80,21 @@ async def update_user(
             logger.info(f"Updating existing company: {user_company.company_id}")
             company = db.query(Company).filter(Company.id == user_company.company_id).first()
             company.name = request.company_name
+            company.clerk_organization_id = request.clerk_organization_id
         else:
             logger.info("Creating new company")
             company = Company(
                 id=uuid.uuid4(),
-                name=request.company_name
+                name=request.company_name,
+                clerk_organization_id=request.clerk_organization_id
             )
             db.add(company)
             db.flush()
             
             user_company = UserCompany(
                 user_id=user_id,
-                company_id=company.id
+                company_id=company.id,
+                role='admin'
             )
             db.add(user_company)
         
@@ -100,7 +104,8 @@ async def update_user(
         return {
             "message": "Company created successfully",
             "company_name": company.name,
-            "company_id": str(company.id)
+            "company_id": str(company.id),
+            "clerk_organization_id": company.clerk_organization_id
         }
         
     except HTTPException:
