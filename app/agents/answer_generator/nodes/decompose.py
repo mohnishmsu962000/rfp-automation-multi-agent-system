@@ -1,40 +1,37 @@
-from app.services.llm_factory import LLMFactory
 from app.agents.answer_generator.state import AnswerGeneratorState
-from app.prompts.answer_generator import DECOMPOSE_QUERY_PROMPT, SHOULD_DECOMPOSE_PROMPT
-from langchain_core.messages import SystemMessage, HumanMessage
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 def decompose_query_node(state: AnswerGeneratorState) -> AnswerGeneratorState:
     question = state["question"]
     
-    should_decompose = _check_if_decompose_needed(question)
+    should_decompose = (
+        len(question.split()) > 20 and
+        any(word in question.lower() for word in [' and ', ' also ', ' additionally', 'provide details on', 'describe', 'explain', 'what about'])
+    )
     
     if not should_decompose:
         state["decomposed_queries"] = [question]
         return state
     
-    llm = LLMFactory.get_llm("gpt-4o-mini")
-    prompt = DECOMPOSE_QUERY_PROMPT.format(question=question)
+    patterns = [
+        r'\.\s+(?:Also|Additionally|Furthermore|Moreover|Specifically)',
+        r'\?\s+(?:Also|Additionally|What about|How about)',
+    ]
     
-    response = llm.invoke(prompt)
-    queries = [q.strip() for q in response.content.split("\n") if q.strip()]
+    parts = [question]
+    for pattern in patterns:
+        new_parts = []
+        for part in parts:
+            split_parts = re.split(pattern, part, flags=re.IGNORECASE)
+            new_parts.extend([p.strip() for p in split_parts if p.strip()])
+        parts = new_parts
     
-    if not queries or len(queries) == 1:
-        state["decomposed_queries"] = [question]
-    else:
-        state["decomposed_queries"] = queries[:5]
+    decomposed = parts[:4] if len(parts) > 1 else [question]
+    
+    state["decomposed_queries"] = decomposed
+    logger.info(f"Decomposed into {len(decomposed)} queries")
     
     return state
-
-
-def _check_if_decompose_needed(question: str) -> bool:
-    """Use LLM to determine if decomposition is needed"""
-    try:
-        llm = LLMFactory.get_llm("gpt-4o-mini")
-        prompt = SHOULD_DECOMPOSE_PROMPT.format(question=question)
-        
-        response = llm.invoke(prompt)
-        answer = response.content.strip().upper()
-        
-        return "YES" in answer
-    except Exception as e:
-        return len(question.split()) > 30 and ("?" in question[:-1])
