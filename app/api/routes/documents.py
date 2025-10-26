@@ -26,7 +26,7 @@ def get_usage_stats(
 
 @router.post("/", response_model=dict)
 async def upload_document(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     doc_type: str = Form(...),
     tags: str = Form(""),
     current_user: dict = Depends(get_current_user),
@@ -36,48 +36,74 @@ async def upload_document(
     company_id = uuid.UUID(current_user["company_id"])
     
     usage_service = UsageService(db)
+    
+    uploaded_docs = []
+    failed_docs = []
+    
+    for file in files:
+        allowed, info = usage_service.check_doc_limit(str(company_id))
+        
+        if not allowed:
+            failed_docs.append({
+                "filename": file.filename,
+                "reason": f"Monthly document limit reached. Used {info['used']}/{info['limit']} documents."
+            })
+            continue
+        
+        try:
+            file_content = await file.read()
+            
+            max_size = 10 * 1024 * 1024
+            if len(file_content) > max_size:
+                failed_docs.append({
+                    "filename": file.filename,
+                    "reason": "File too large. Maximum size is 10MB."
+                })
+                continue
+            
+            file_url = StorageService.upload_file(file_content, file.filename)
+            
+            tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
+            
+            document = Document(
+                user_id=user_id,
+                company_id=company_id,
+                filename=file.filename,
+                file_url=file_url,
+                doc_type=doc_type.upper(),
+                tags=tag_list,
+                processing_status=ProcessingStatus.PENDING
+            )
+            
+            db.add(document)
+            db.flush()
+            
+            usage_service.increment_doc_usage(str(company_id))
+            
+            process_document_task.delay(str(document.id))
+            
+            uploaded_docs.append({
+                "filename": file.filename,
+                "id": str(document.id),
+                "job_id": f"doc_{document.id}"
+            })
+            
+        except Exception as e:
+            failed_docs.append({
+                "filename": file.filename,
+                "reason": str(e)
+            })
+    
+    db.commit()
+    
     allowed, info = usage_service.check_doc_limit(str(company_id))
     
-    if not allowed:
-        raise APIError(
-            status_code=429,
-            message=f"Monthly document limit reached. Used {info['used']}/{info['limit']} documents on {info['plan']} plan. Upgrade to upload more."
-        )
-    
-    file_content = await file.read()
-    
-    max_size = 10 * 1024 * 1024
-    if len(file_content) > max_size:
-        raise APIError(status_code=400, message="File too large. Maximum size is 10MB.")
-    
-    file_url = StorageService.upload_file(file_content, file.filename)
-    
-    tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
-    
-    document = Document(
-        user_id=user_id,
-        company_id=company_id,
-        filename=file.filename,
-        file_url=file_url,
-        doc_type=doc_type.upper(),
-        tags=tag_list,
-        processing_status=ProcessingStatus.PENDING
-    )
-    
-    db.add(document)
-    db.commit()
-    db.refresh(document)
-    
-    usage_service.increment_doc_usage(str(company_id))
-    
-    process_document_task.delay(str(document.id))
-    
-    job_id = f"doc_{document.id}"
-    
     return {
-        "success": True,
-        "message": f"Document upload started. {info['remaining'] - 1} uploads remaining this month.",
-        "job_id": job_id
+        "success": len(uploaded_docs) > 0,
+        "uploaded": uploaded_docs,
+        "failed": failed_docs,
+        "remaining": info.get('remaining', 0),
+        "message": f"Uploaded {len(uploaded_docs)} documents. {len(failed_docs)} failed."
     }
 
 @router.get("/", response_model=List[DocumentResponse])
