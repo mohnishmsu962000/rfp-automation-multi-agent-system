@@ -1,20 +1,20 @@
 SUBSCRIPTION_PLANS = {
     "starter": {
-        "plan_id": "plan_RY28EDrIpxnSjb",
+        "plan_id": "plan_RY41A8qKz1MgSw",
         "name": "Starter",
         "price": 3999,
         "rfp_limit": 10,
         "doc_limit": 50,
     },
     "growth": {
-        "plan_id": "plan_RY28qIQoiKhR1s",
+        "plan_id": "plan_RY41P3CLgQpHA6",
         "name": "Growth", 
         "price": 7999,
         "rfp_limit": 25,
         "doc_limit": 150,
     },
     "pro": {
-        "plan_id": "plan_RY29PU7dxni8n7",
+        "plan_id": "plan_RY41dLUizZQvpP",
         "name": "Pro",
         "price": 15999,
         "rfp_limit": 100,
