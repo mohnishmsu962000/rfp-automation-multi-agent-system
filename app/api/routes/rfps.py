@@ -8,7 +8,7 @@ from app.models.rfp_project import RFPProject, RFPStatus
 from app.models.rfp_question import RFPQuestion
 from app.api.schemas.rfp import RFPProjectResponse, RFPQuestionResponse, QuestionUpdate, RephraseRequest
 from app.services.storage import StorageService
-from app.services.rate_limiter import RateLimiter
+from app.services.usage_service import UsageTracking
 from app.services.export_service import ExportService
 from app.services.llm_factory import LLMFactory
 from app.prompts.answer_generator import REPHRASE_ANSWER_SYSTEM, REPHRASE_ANSWER_USER
@@ -32,12 +32,13 @@ async def upload_rfp(
     user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
-    allowed, used, remaining = RateLimiter.check_rfp_quota(company_id, db)
+    usage_service = UsageTracking(db)
+    allowed, info = usage_service.check_rfp_limit(str(company_id))
     
     if not allowed:
         raise HTTPException(
             status_code=429,
-            detail=f"Monthly RFP limit reached. You have created {used}/20 RFPs this month."
+            detail=f"Monthly RFP limit reached. Used {info['used']}/{info['limit']} RFPs on {info['plan']} plan. Upgrade to process more."
         )
     
     file_content = await file.read()
@@ -55,11 +56,13 @@ async def upload_rfp(
     db.commit()
     db.refresh(rfp)
     
+    usage_service.increment_rfp_usage(str(company_id))
+    
     process_rfp_task.delay(str(rfp.id))
     
     return {
         "success": True,
-        "message": f"RFP processing started. {remaining - 1} RFPs remaining this month.",
+        "message": f"RFP processing started. {info['remaining'] - 1} RFPs remaining this month.",
         "job_id": f"rfp_{rfp.id}"
     }
 

@@ -5,16 +5,13 @@ from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.core.errors import APIResponse, APIError
 from app.models.document import Document, DocType, ProcessingStatus
-from app.models.document_quota import DocumentQuota
 from app.api.schemas.document import DocumentResponse, JobStatusResponse
 from app.services.storage import StorageService
+from app.services.usage_service import UsageTracking
 import uuid
 from datetime import datetime
 from app.workers.tasks import process_document_task
 from app.agents.answer_generator import generate_answer_for_question
-from app.services.rate_limiter import RateLimiter
-from app.models.document_quota import DocumentQuota
-from datetime import datetime
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -24,7 +21,8 @@ def get_usage_stats(
     db: Session = Depends(get_db)
 ):
     company_id = uuid.UUID(current_user["company_id"])
-    return RateLimiter.get_usage_stats(company_id, db)
+    usage_service = UsageTracking(db)
+    return usage_service.get_usage_stats(str(company_id))
 
 @router.post("/", response_model=dict)
 async def upload_document(
@@ -37,36 +35,24 @@ async def upload_document(
     user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
-    file_content = await file.read()
+    usage_service = UsageTracking(db)
+    allowed, info = usage_service.check_doc_limit(str(company_id))
     
-    is_valid_size, size_error = RateLimiter.validate_file_size(len(file_content))
-    if not is_valid_size:
-        raise APIError(status_code=400, message=size_error)
-    
-    allowed, used, remaining = RateLimiter.check_document_quota(company_id, db)
     if not allowed:
         raise APIError(
             status_code=429,
-            message=f"Document upload limit reached. You have uploaded {used}/100 documents (lifetime limit)."
+            message=f"Monthly document limit reached. Used {info['used']}/{info['limit']} documents on {info['plan']} plan. Upgrade to upload more."
         )
+    
+    file_content = await file.read()
+    
+    max_size = 10 * 1024 * 1024
+    if len(file_content) > max_size:
+        raise APIError(status_code=400, message="File too large. Maximum size is 10MB.")
     
     file_url = StorageService.upload_file(file_content, file.filename)
     
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
-    
-    quota = db.query(DocumentQuota).filter(
-        DocumentQuota.company_id == company_id
-    ).first()
-    
-    if quota:
-        quota.document_count += 1
-        quota.updated_at = datetime.utcnow()
-    else:
-        quota = DocumentQuota(
-            company_id=company_id,
-            document_count=1
-        )
-        db.add(quota)
     
     document = Document(
         user_id=user_id,
@@ -82,13 +68,15 @@ async def upload_document(
     db.commit()
     db.refresh(document)
     
+    usage_service.increment_doc_usage(str(company_id))
+    
     process_document_task.delay(str(document.id))
     
     job_id = f"doc_{document.id}"
     
     return {
         "success": True,
-        "message": f"Document upload started. {remaining - 1} uploads remaining.",
+        "message": f"Document upload started. {info['remaining'] - 1} uploads remaining this month.",
         "job_id": job_id
     }
 
@@ -140,16 +128,6 @@ def delete_document(
     
     StorageService.delete_file(document.file_url)
     db.delete(document)
-    
-    
-    quota = db.query(DocumentQuota).filter(
-        DocumentQuota.company_id == company_id
-    ).first()
-    
-    if quota and quota.document_count > 0:
-        quota.document_count -= 1
-        quota.updated_at = datetime.utcnow()
-    
     db.commit()
     
     return {"success": True, "message": "Document deleted"}
