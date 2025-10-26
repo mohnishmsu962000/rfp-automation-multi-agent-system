@@ -117,57 +117,85 @@ def _calculate_trust_from_metrics(
     num_sources: int,
     avg_score: float = None
 ) -> float:
+    
     if source_type == "attribute":
-        base = primary_score * 60
+        base = primary_score * 50
     else:
-        base = min(primary_score * 600, 60)
+        base = min(primary_score * 400, 45)
     
     completeness = _calculate_completeness(answer, question)
     
     source_bonus = 0
-    if num_sources >= 3:
-        source_bonus = 15
+    if num_sources >= 5:
+        source_bonus = 12
+    elif num_sources >= 3:
+        source_bonus = 8
     elif num_sources == 2:
-        source_bonus = 10
-    elif num_sources == 1:
         source_bonus = 5
+    elif num_sources == 1:
+        source_bonus = 2
     
     consistency_bonus = 0
     if source_type == "rag" and avg_score:
-        if avg_score > 0.05:
-            consistency_bonus = 10
+        if avg_score > 0.08:
+            consistency_bonus = 12
+        elif avg_score > 0.05:
+            consistency_bonus = 8
         elif avg_score > 0.03:
-            consistency_bonus = 5
+            consistency_bonus = 3
     
-    if source_type == "attribute" and num_sources > 1:
-        consistency_bonus = 10
+    if source_type == "attribute" and num_sources > 2:
+        consistency_bonus = 8
+    elif source_type == "attribute" and num_sources > 1:
+        consistency_bonus = 5
     
     total = base + completeness + source_bonus + consistency_bonus
     
-    return round(min(total, 100), 2)
+    if total >= 95:
+        return round(min(total * 0.95, 98), 1)
+    
+    return round(min(total, 100), 1)
 
 
 def _calculate_completeness(answer: str, question: str) -> float:
+    
     answer_length = len(answer)
-    if answer_length < 100:
-        length_score = 0
-    elif answer_length < 300:
-        length_score = 5
-    elif answer_length < 800:
+    if answer_length < 150:
+        length_score = 2
+    elif answer_length < 400:
+        length_score = 6
+    elif answer_length < 1000:
         length_score = 10
     else:
-        length_score = 15
+        length_score = 14
     
     question_keywords = set(re.findall(r'\b\w{4,}\b', question.lower()))
     answer_keywords = set(re.findall(r'\b\w{4,}\b', answer.lower()))
     
+    question_keywords.discard('your')
+    question_keywords.discard('does')
+    question_keywords.discard('what')
+    question_keywords.discard('please')
+    question_keywords.discard('provide')
+    question_keywords.discard('describe')
+    
     if question_keywords:
         overlap_ratio = len(question_keywords & answer_keywords) / len(question_keywords)
-        keyword_score = overlap_ratio * 10
+        keyword_score = min(overlap_ratio * 16, 16)
     else:
-        keyword_score = 5
+        keyword_score = 8
     
-    return length_score + keyword_score
+    has_numbers = bool(re.search(r'\d+', answer))
+    has_bullets = bool(re.search(r'^[\s]*[-*]\s', answer, re.MULTILINE))
+    has_headers = bool(re.search(r'^#{1,3}\s', answer, re.MULTILINE))
+    
+    structure_score = 0
+    if has_numbers:
+        structure_score += 2
+    if has_bullets or has_headers:
+        structure_score += 3
+    
+    return length_score + keyword_score + structure_score
 
 
 def _deduplicate_chunks(chunks: list) -> list:
