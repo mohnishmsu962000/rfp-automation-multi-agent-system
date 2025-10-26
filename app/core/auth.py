@@ -2,11 +2,10 @@ from fastapi import HTTPException, Header
 from typing import Optional
 from app.core.config import get_settings
 from app.core.database import SessionLocal
-from app.models.user_company import UserCompany
+from app.models.company import Company
 import jwt
 from jwt import PyJWKClient
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -33,38 +32,34 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         logger.info(f"Decoded token contents: {decoded}")
         
         user_id = decoded.get("sub")
-        logger.info(f"Checking user company for user_id: {user_id}")
+        org_id = decoded.get("org_id")
+        org_role = decoded.get("org_role")
+        
+        logger.info(f"User: {user_id}, Org: {org_id}, Role: {org_role}")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
         
+        if not org_id:
+            raise HTTPException(status_code=403, detail="User not in any organization. Please complete onboarding.")
+        
         db = SessionLocal()
         try:
-            max_retries = 3
-            user_company = None
+            company = db.query(Company).filter(
+                Company.clerk_organization_id == org_id
+            ).first()
             
-            for attempt in range(max_retries):
-                user_company = db.query(UserCompany).filter(
-                    UserCompany.user_id == user_id
-                ).first()
-                
-                if user_company:
-                    break
-                
-                if attempt < max_retries - 1:
-                    logger.info(f"Retry {attempt + 1}/{max_retries} for user {user_id}")
-                    time.sleep(0.1)
-                    db.expire_all()
+            if not company:
+                logger.warning(f"No company found for org_id: {org_id}")
+                raise HTTPException(status_code=404, detail="Company not found for organization")
             
-            if not user_company:
-                logger.warning(f"No company found for user: {user_id}")
-                raise HTTPException(status_code=403, detail="User not associated with any company")
-            
-            logger.info(f"Found company {user_company.company_id} for user {user_id}")
+            logger.info(f"Found company {company.id} for org {org_id}")
             
             return {
                 "user_id": user_id,
-                "company_id": str(user_company.company_id),
+                "company_id": str(company.id),
+                "org_id": org_id,
+                "role": org_role,
                 "email": decoded.get("email", "noemail@example.com")
             }
         finally:

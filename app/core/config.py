@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, Field
 from functools import lru_cache
 
 class Settings(BaseSettings):
@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str
     RAZORPAY_KEY_SECRET: str
     RAZORPAY_WEBHOOK_SECRET: str
+    
+    RESEND_API_KEY: str = Field(..., env="RESEND_API_KEY")
     
     class Config:
         env_file = ".env"

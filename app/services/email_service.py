@@ -1,0 +1,112 @@
+import resend
+from app.core.config import get_settings
+
+settings = get_settings()
+resend.api_key = settings.RESEND_API_KEY
+
+
+class EmailService:
+    
+    @staticmethod
+    def send_quota_warning(email: str, name: str, used: int, limit: int, quota_type: str, tier: str):
+        percentage = int((used / limit) * 100)
+        
+        try:
+            resend.Emails.send({
+                "from": "ScaleRFP <noreply@resend.dev>",
+                "to": email,
+                "subject": f"⚠️ {percentage}% of your {quota_type} quota used",
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #f59e0b;">Running Low on {quota_type}!</h2>
+                    <p>Hi {name},</p>
+                    <p>You've used <strong>{used} out of {limit}</strong> {quota_type.lower()} this month on your <strong>{tier.title()}</strong> plan.</p>
+                    <p>That's <strong>{percentage}%</strong> of your monthly quota.</p>
+                    <div style="margin: 30px 0;">
+                        <a href="https://app.scalerfp.com/dashboard/settings/billing" 
+                           style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
+                            Upgrade Now
+                        </a>
+                    </div>
+                    <p style="color: #666; font-size: 14px;">
+                        Upgrade to a higher plan to get more capacity and avoid interruptions.
+                    </p>
+                </div>
+                """
+            })
+        except Exception as e:
+            print(f"Error sending quota warning email: {e}")
+    
+    @staticmethod
+    def send_subscription_activated(email: str, name: str, plan_name: str, price: int):
+        try:
+            resend.Emails.send({
+                "from": "ScaleRFP <noreply@resend.dev>",
+                "to": email,
+                "subject": f"🎉 Welcome to {plan_name}!",
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #10b981;">Subscription Activated!</h2>
+                    <p>Hi {name},</p>
+                    <p>Your <strong>{plan_name}</strong> subscription is now active.</p>
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0;"><strong>Plan:</strong> {plan_name}</p>
+                        <p style="margin: 10px 0 0 0;"><strong>Amount:</strong> ₹{price:,}/month</p>
+                    </div>
+                    <p>You can now enjoy all the benefits of your new plan!</p>
+                    <a href="https://app.scalerfp.com/dashboard" 
+                       style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin-top: 20px;">
+                        Go to Dashboard
+                    </a>
+                </div>
+                """
+            })
+        except Exception as e:
+            print(f"Error sending subscription activated email: {e}")
+    
+    @staticmethod
+    def send_payment_failed(email: str, name: str, plan_name: str):
+        try:
+            resend.Emails.send({
+                "from": "ScaleRFP <noreply@resend.dev>",
+                "to": email,
+                "subject": "❌ Payment Failed",
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #ef4444;">Payment Failed</h2>
+                    <p>Hi {name},</p>
+                    <p>We couldn't process your payment for the <strong>{plan_name}</strong> plan.</p>
+                    <p>Please update your payment method to continue using your subscription.</p>
+                    <a href="https://app.scalerfp.com/dashboard/settings/billing" 
+                       style="background: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin-top: 20px;">
+                        Update Payment Method
+                    </a>
+                </div>
+                """
+            })
+        except Exception as e:
+            print(f"Error sending payment failed email: {e}")
+    
+    @staticmethod
+    def send_subscription_cancelled(email: str, name: str, plan_name: str, end_date: str):
+        try:
+            resend.Emails.send({
+                "from": "ScaleRFP <noreply@resend.dev>",
+                "to": email,
+                "subject": "Subscription Cancelled",
+                "html": f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2>Subscription Cancelled</h2>
+                    <p>Hi {name},</p>
+                    <p>Your <strong>{plan_name}</strong> subscription has been cancelled.</p>
+                    <p>You'll continue to have access until <strong>{end_date}</strong>.</p>
+                    <p>We're sorry to see you go! If you change your mind, you can reactivate anytime.</p>
+                    <a href="https://app.scalerfp.com/dashboard/settings/billing" 
+                       style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin-top: 20px;">
+                        Reactivate Subscription
+                    </a>
+                </div>
+                """
+            })
+        except Exception as e:
+            print(f"Error sending cancellation email: {e}")
