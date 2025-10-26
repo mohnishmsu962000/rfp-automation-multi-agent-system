@@ -30,6 +30,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             options={"verify_exp": True}
         )
         
+        logger.info(f"Decoded token contents: {decoded}")
+        
         user_id = decoded.get("sub")
         logger.info(f"Checking user company for user_id: {user_id}")
         
