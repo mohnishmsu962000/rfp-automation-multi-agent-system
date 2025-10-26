@@ -73,17 +73,16 @@ async def update_user(
             db.add(user)
             db.commit()
         
-        user_company = db.query(UserCompany).filter(
-            UserCompany.user_id == user_id
+        existing_company = db.query(Company).filter(
+            Company.clerk_organization_id == request.clerk_organization_id
         ).first()
         
         is_new_company = False
         
-        if user_company:
-            logger.info(f"Updating existing company: {user_company.company_id}")
-            company = db.query(Company).filter(Company.id == user_company.company_id).first()
-            company.name = request.company_name
-            company.clerk_organization_id = request.clerk_organization_id
+        if existing_company:
+            logger.info(f"Updating existing company: {existing_company.id}")
+            existing_company.name = request.company_name
+            company = existing_company
         else:
             logger.info("Creating new company")
             company = Company(
@@ -106,6 +105,7 @@ async def update_user(
         logger.info("Company saved successfully")
         
         if is_new_company:
+            logger.info(f"Sending welcome email to {email}")
             EmailService.send_welcome_email(
                 email=email,
                 name=name,
