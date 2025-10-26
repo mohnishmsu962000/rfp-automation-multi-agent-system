@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     LANGCHAIN_TRACING_V2: str = "true"
     LANGCHAIN_PROJECT: str = "rfp-generator"
     
+    RAZORPAY_KEY_ID: str
+    RAZORPAY_KEY_SECRET: str
+    RAZORPAY_WEBHOOK_SECRET: str
+    
     class Config:
         env_file = ".env"
 
