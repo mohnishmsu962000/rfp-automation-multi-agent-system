@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.services.billing_service import BillingService
+from app.services.usage_service import UsageTracking
 from app.core.plans import SUBSCRIPTION_PLANS
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -32,6 +33,21 @@ async def get_subscription_status(
     return status
 
 
+@router.get("/usage")
+async def get_usage_stats(
+    auth_data: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    company_id = auth_data["company_id"]
+    usage_service = UsageTracking(db)
+    stats = usage_service.get_usage_stats(company_id)
+    
+    if not stats:
+        raise HTTPException(status_code=404, detail="Company not found")
+    
+    return stats
+
+
 @router.post("/subscribe")
 async def create_subscription(
     request: CreateSubscriptionRequest,
@@ -39,12 +55,13 @@ async def create_subscription(
     db: Session = Depends(get_db)
 ):
     company_id = auth_data["company_id"]
+    user_email = auth_data["email"]
     
     if request.plan_tier not in ["starter", "growth", "pro"]:
         raise HTTPException(status_code=400, detail="Invalid plan tier")
     
     try:
-        subscription = BillingService.create_subscription(company_id, request.plan_tier, db)
+        subscription = BillingService.create_subscription(company_id, request.plan_tier, user_email, db)
         return {
             "success": True,
             "subscription_id": subscription['id'],

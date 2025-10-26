@@ -65,6 +65,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             return {
                 "user_id": user_id,
                 "company_id": str(user_company.company_id),
+                "email": decoded.get("email", "noemail@example.com")
             }
         finally:
             db.close()

@@ -35,7 +35,7 @@ class BillingService:
             raise
     
     @staticmethod
-    def create_subscription(company_id: str, plan_tier: str, db: Session):
+    def create_subscription(company_id: str, plan_tier: str, user_email: str, db: Session):
         try:
             company = db.query(Company).filter(Company.id == company_id).first()
             if not company:
@@ -44,7 +44,7 @@ class BillingService:
             if not company.razorpay_customer_id:
                 customer = BillingService.create_customer(
                     company_id=str(company.id),
-                    email=company.email or "noemail@example.com",
+                    email=user_email,
                     name=company.name,
                     db=db
                 )
