@@ -5,6 +5,7 @@ from app.models.company import Company
 from app.models.user_company import UserCompany
 from app.models.user import User
 from app.api.routes.auth import get_current_user
+from app.services.email_service import EmailService
 from sqlalchemy.orm import Session
 import uuid
 import logging
@@ -76,6 +77,8 @@ async def update_user(
             UserCompany.user_id == user_id
         ).first()
         
+        is_new_company = False
+        
         if user_company:
             logger.info(f"Updating existing company: {user_company.company_id}")
             company = db.query(Company).filter(Company.id == user_company.company_id).first()
@@ -97,9 +100,17 @@ async def update_user(
                 role='admin'
             )
             db.add(user_company)
+            is_new_company = True
         
         db.commit()
         logger.info("Company saved successfully")
+        
+        if is_new_company:
+            EmailService.send_welcome_email(
+                email=email,
+                name=name,
+                company_name=request.company_name
+            )
         
         return {
             "message": "Company created successfully",
