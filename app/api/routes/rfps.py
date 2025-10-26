@@ -8,7 +8,7 @@ from app.models.rfp_project import RFPProject, RFPStatus
 from app.models.rfp_question import RFPQuestion
 from app.api.schemas.rfp import RFPProjectResponse, RFPQuestionResponse, QuestionUpdate, RephraseRequest
 from app.services.storage import StorageService
-from app.services.usage_service import UsageTracking
+from app.services.usage_service import UsageService
 from app.services.export_service import ExportService
 from app.services.llm_factory import LLMFactory
 from app.prompts.answer_generator import REPHRASE_ANSWER_SYSTEM, REPHRASE_ANSWER_USER
@@ -32,7 +32,7 @@ async def upload_rfp(
     user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
-    usage_service = UsageTracking(db)
+    usage_service = UsageService(db)
     allowed, info = usage_service.check_rfp_limit(str(company_id))
     
     if not allowed:

@@ -7,7 +7,7 @@ from app.core.errors import APIResponse, APIError
 from app.models.document import Document, DocType, ProcessingStatus
 from app.api.schemas.document import DocumentResponse, JobStatusResponse
 from app.services.storage import StorageService
-from app.services.usage_service import UsageTracking
+from app.services.usage_service import UsageService
 import uuid
 from datetime import datetime
 from app.workers.tasks import process_document_task
@@ -21,7 +21,7 @@ def get_usage_stats(
     db: Session = Depends(get_db)
 ):
     company_id = uuid.UUID(current_user["company_id"])
-    usage_service = UsageTracking(db)
+    usage_service = UsageService(db)
     return usage_service.get_usage_stats(str(company_id))
 
 @router.post("/", response_model=dict)
@@ -35,7 +35,7 @@ async def upload_document(
     user_id = current_user["user_id"]
     company_id = uuid.UUID(current_user["company_id"])
     
-    usage_service = UsageTracking(db)
+    usage_service = UsageService(db)
     allowed, info = usage_service.check_doc_limit(str(company_id))
     
     if not allowed:
