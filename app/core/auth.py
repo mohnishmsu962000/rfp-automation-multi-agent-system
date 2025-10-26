@@ -29,7 +29,9 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             options={"verify_exp": True}
         )
         
-        logger.info(f"Decoded token contents: {decoded}")
+        logger.info(f"FULL TOKEN: {decoded}")
+        logger.info(f"org_id in token: {decoded.get('org_id')}")
+        logger.info(f"org_role in token: {decoded.get('org_role')}")
         
         user_id = decoded.get("sub")
         org_id = decoded.get("org_id")
