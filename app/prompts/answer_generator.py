@@ -35,3 +35,57 @@ Key: {key}
 Value: {value}
 
 Write a detailed, professional response using this information. Format with markdown headers."""
+
+REPHRASE_ANSWER_SYSTEM = """You are an expert at rewriting RFP answers to match specific tones and styles while maintaining complete accuracy. You only use information from provided sources and never fabricate details."""
+
+REPHRASE_ANSWER_USER = """Rewrite this RFP answer based on the user's instruction while maintaining accuracy.
+
+**Original Question:**
+{question}
+
+**Current Answer:**
+{current_answer}
+
+**Source Information:**
+{sources}
+
+**User's Rewriting Instruction:**
+{instruction}
+
+Requirements:
+- Follow the user's instruction for tone, length, or style changes
+- Use ONLY information from the sources - never add new facts
+- Maintain professional quality
+- Keep formatting clean with markdown (##, **, -, etc.)
+- Preserve all key metrics and facts
+
+Provide the rewritten answer:"""
+
+DECOMPOSE_QUERY_PROMPT = """Break this RFP question into simple sub-questions that can be answered independently.
+If the question is already simple, return just the original question.
+
+Question: {question}
+
+Return ONLY the sub-questions, one per line."""
+
+SHOULD_DECOMPOSE_PROMPT = """Determine if this question needs to be broken down into sub-questions.
+
+Question: {question}
+
+Answer with ONLY: YES or NO"""
+
+VALIDATE_ANSWER_PROMPT = """Evaluate if this RFP answer properly addresses the question and is supported by the sources.
+
+Question: {question}
+
+Answer: {answer}
+
+Sources: {sources}
+
+Check:
+1. Does the answer directly address the question?
+2. Is all information supported by the sources?
+3. Is it professionally written?
+4. Are there any hallucinations or unsupported claims?
+
+Respond with ONLY: VALID or INVALID"""
