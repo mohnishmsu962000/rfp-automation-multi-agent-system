@@ -205,6 +205,7 @@ multidict==6.7.0
     #   yarl
 numpy==2.3.4
     # via
+    #   rfp-backend (pyproject.toml)
     #   pgvector
     #   rank-bm25
 openai==2.6.0
@@ -311,6 +312,8 @@ pyyaml==6.0.3
     #   langchain-core
 rank-bm25==0.2.2
     # via rfp-backend (pyproject.toml)
+razorpay==2.0.0
+    # via rfp-backend (pyproject.toml)
 realtime==2.22.1
     # via supabase
 redis==7.0.0
@@ -325,6 +328,7 @@ requests==2.32.5
     #   google-api-core
     #   huggingface-hub
     #   langsmith
+    #   razorpay
     #   requests-toolbelt
     #   tiktoken
 requests-toolbelt==1.0.0
