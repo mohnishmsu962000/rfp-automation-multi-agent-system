@@ -7,7 +7,7 @@ from app.core.plans import get_plan_config
 from app.core.database import SessionLocal
 
 
-class UsageTracking:
+class UsageService:
     def __init__(self, db: Session):
         self.db = db
     

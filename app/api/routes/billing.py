@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.services.billing_service import BillingService
-from app.services.usage_service import UsageTracking
+from app.services.usage_service import UsageService
 from app.core.plans import SUBSCRIPTION_PLANS
 
 router = APIRouter(prefix="/billing", tags=["billing"])
@@ -39,7 +39,7 @@ async def get_usage_stats(
     db: Session = Depends(get_db)
 ):
     company_id = auth_data["company_id"]
-    usage_service = UsageTracking(db)
+    usage_service = UsageService(db)
     stats = usage_service.get_usage_stats(company_id)
     
     if not stats:
