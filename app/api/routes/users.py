@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
+from typing import Optional
 from app.core.database import SessionLocal
 from app.models.company import Company
 from app.models.user_company import UserCompany
@@ -17,6 +18,11 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 class UpdateUserRequest(BaseModel):
     company_name: str
     clerk_organization_id: str
+    company_name: str
+    clerk_organization_id: str
+    rfps_per_month: Optional[str] = None
+    team_size: Optional[str] = None
+    industry: Optional[str] = None
 
 def get_db():
     db = SessionLocal()
@@ -143,3 +149,5 @@ async def get_user(
         "company_id": str(company.id),
         "company_name": company.name
     }
+    
+    
