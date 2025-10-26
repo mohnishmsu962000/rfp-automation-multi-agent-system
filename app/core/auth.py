@@ -11,10 +11,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 async def get_current_user(authorization: Optional[str] = Header(None)):
+    logger.info("=== AUTH START ===")
+    logger.info(f"Authorization header present: {authorization is not None}")
+    
     if not authorization or not authorization.startswith("Bearer "):
+        logger.error("Missing or invalid authorization header")
         raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
     
     token = authorization.replace("Bearer ", "")
+    logger.info(f"Token extracted, length: {len(token)}")
     
     try:
         jwks_url = "https://helping-grizzly-76.clerk.accounts.dev/.well-known/jwks.json"
@@ -43,6 +48,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
         
         if not org_id:
+            logger.error(f"No org_id in token for user {user_id}")
             raise HTTPException(status_code=403, detail="User not in any organization. Please complete onboarding.")
         
         db = SessionLocal()
