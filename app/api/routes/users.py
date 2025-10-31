@@ -60,7 +60,8 @@ async def update_user(
         )
         
         user_id = decoded.get("sub")
-        email = decoded.get("email") or decoded.get("primary_email_address_id") or f"{user_id}@temp.local"
+        logger.info(f"FULL DECODED TOKEN: {decoded}")
+        email = decoded.get("email") or decoded.get("email_addresses", [{}])[0].get("email_address") or f"{user_id}@temp.local"
         name = decoded.get("name") or decoded.get("first_name", "") + " " + decoded.get("last_name", "") or email.split("@")[0]
         
         logger.info(f"User ID: {user_id}, Email: {email}, Name: {name}")
