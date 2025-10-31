@@ -25,6 +25,9 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         jwks_url = "https://clerk.scalerfp.com/.well-known/jwks.json"
         
         jwks_client = PyJWKClient(jwks_url)
+        import jwt
+        header = jwt.get_unverified_header(token)
+        logger.info(f"JWT Header: {header}")
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         
         decoded = jwt.decode(
