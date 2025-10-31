@@ -11,7 +11,7 @@ class EmailService:
     def send_welcome_email(email: str, name: str, company_name: str):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": "Welcome to ScaleRFP! 🎉",
                 "html": f"""
@@ -43,7 +43,7 @@ class EmailService:
         
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": f"⚠️ {percentage}% of your {quota_type} quota used",
                 "html": f"""
@@ -71,7 +71,7 @@ class EmailService:
     def send_quota_limit_reached(email: str, name: str, limit: int, quota_type: str, tier: str, reset_date: str):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": f"🚨 {quota_type} Limit Reached",
                 "html": f"""
@@ -100,7 +100,7 @@ class EmailService:
     def send_quota_reset(email: str, name: str, tier: str, rfp_limit: int, doc_limit: int):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": "✨ Monthly Quota Reset",
                 "html": f"""
@@ -130,7 +130,7 @@ class EmailService:
     def send_subscription_upgraded(email: str, name: str, old_plan: str, new_plan: str, new_price: int, rfp_limit: int, doc_limit: int):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": f"🚀 Upgraded to {new_plan}!",
                 "html": f"""
@@ -160,7 +160,7 @@ class EmailService:
     def send_subscription_activated(email: str, name: str, plan_name: str, price: int):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": f"🎉 Welcome to {plan_name}!",
                 "html": f"""
@@ -187,7 +187,7 @@ class EmailService:
     def send_payment_failed(email: str, name: str, plan_name: str):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": "❌ Payment Failed",
                 "html": f"""
@@ -210,7 +210,7 @@ class EmailService:
     def send_subscription_cancelled(email: str, name: str, plan_name: str, end_date: str):
         try:
             resend.Emails.send({
-                "from": "ScaleRFP <notifications@scalerfp.com>",
+                "from": "ScaleRFP <noreply@scalerfp.com>",
                 "to": email,
                 "subject": "Subscription Cancelled",
                 "html": f"""
