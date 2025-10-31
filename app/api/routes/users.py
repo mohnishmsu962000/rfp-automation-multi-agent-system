@@ -48,7 +48,7 @@ async def update_user(
         from jwt import PyJWKClient
         import jwt
         
-        jwks_url = "https://helping-grizzly-76.clerk.accounts.dev/.well-known/jwks.json"
+        jwks_url = "https://clerk.scalerfp.com/.well-known/jwks.json"
         jwks_client = PyJWKClient(jwks_url)
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         
