@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.core.database import SessionLocal
 from app.models.company import Company
 from app.models.user_company import UserCompany
 from app.models.user import User
-from app.api.routes.auth import get_current_user
+from app.core.auth import get_current_user
 from app.services.email_service import EmailService
 from sqlalchemy.orm import Session
 import uuid
@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 class UpdateUserRequest(BaseModel):
-    company_name: str
-    clerk_organization_id: str
     company_name: str
     clerk_organization_id: str
     rfps_per_month: Optional[str] = None
@@ -34,40 +32,17 @@ def get_db():
 @router.patch("/me")
 async def update_user(
     request: UpdateUserRequest,
-    authorization: str = Header(None),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
         logger.info(f"Received company name update request: {request.company_name}")
         
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Missing authorization")
-        
-        token = authorization.replace("Bearer ", "")
-        
-        from jwt import PyJWKClient
-        import jwt
-        
-        jwks_url = "https://clerk.scalerfp.com/.well-known/jwks.json"
-        jwks_client = PyJWKClient(jwks_url)
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        
-        decoded = jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            options={"verify_exp": True}
-        )
-        
-        user_id = decoded.get("sub")
-        logger.info(f"FULL DECODED TOKEN: {decoded}")
-        email = decoded.get("email") or decoded.get("email_addresses", [{}])[0].get("email_address") or f"{user_id}@temp.local"
-        name = decoded.get("name") or decoded.get("first_name", "") + " " + decoded.get("last_name", "") or email.split("@")[0]
+        user_id = current_user["user_id"]
+        email = current_user["email"]
+        name = email.split("@")[0]
         
         logger.info(f"User ID: {user_id}, Email: {email}, Name: {name}")
-        
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
         
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -150,5 +125,3 @@ async def get_user(
         "company_id": str(company.id),
         "company_name": company.name
     }
-    
-    
