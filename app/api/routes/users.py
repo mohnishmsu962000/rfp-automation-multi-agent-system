@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from app.core.database import SessionLocal
@@ -10,6 +10,8 @@ from app.services.email_service import EmailService
 from sqlalchemy.orm import Session
 import uuid
 import logging
+from jwt import PyJWKClient
+import jwt
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +34,36 @@ def get_db():
 @router.patch("/me")
 async def update_user(
     request: UpdateUserRequest,
-    current_user: dict = Depends(get_current_user),
+    authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
     try:
         logger.info(f"Received company name update request: {request.company_name}")
         
-        user_id = current_user["user_id"]
-        email = current_user["email"]
-        name = email.split("@")[0]
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing authorization")
+        
+        token = authorization.replace("Bearer ", "")
+        
+        jwks_url = "https://clerk.scalerfp.com/.well-known/jwks.json"
+        jwks_client = PyJWKClient(jwks_url)
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        
+        decoded = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_exp": True}
+        )
+        
+        user_id = decoded.get("sub")
+        email = decoded.get("email", f"{user_id}@temp.local")
+        name = decoded.get("name") or decoded.get("first_name", "") or email.split("@")[0]
         
         logger.info(f"User ID: {user_id}, Email: {email}, Name: {name}")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
         
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
