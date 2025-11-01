@@ -141,7 +141,7 @@ class EmailService:
                     <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                         <p style="margin: 0;"><strong>New Plan Details:</strong></p>
                         <p style="margin: 10px 0 0 0;"><strong>Plan:</strong> {new_plan}</p>
-                        <p style="margin: 10px 0 0 0;"><strong>Amount:</strong> ₹{new_price:,}/month</p>
+                        <p style="margin: 10px 0 0 0;"><strong>Amount:</strong> ${new_price}/month</p>
                         <p style="margin: 10px 0 0 0;"><strong>RFPs:</strong> {rfp_limit}/month</p>
                         <p style="margin: 10px 0 0 0;"><strong>Documents:</strong> {doc_limit}/month</p>
                     </div>
@@ -170,7 +170,7 @@ class EmailService:
                     <p>Your <strong>{plan_name}</strong> subscription is now active.</p>
                     <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
                         <p style="margin: 0;"><strong>Plan:</strong> {plan_name}</p>
-                        <p style="margin: 10px 0 0 0;"><strong>Amount:</strong> ₹{price:,}/month</p>
+                        <p style="margin: 10px 0 0 0;"><strong>Amount:</strong> ${price}/month</p>
                     </div>
                     <p>You can now enjoy all the benefits of your new plan!</p>
                     <a href="https://app.scalerfp.com/dashboard" 

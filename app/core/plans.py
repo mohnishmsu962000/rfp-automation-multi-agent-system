@@ -2,21 +2,21 @@ SUBSCRIPTION_PLANS = {
     "starter": {
         "plan_id": "plan_RY41A8qKz1MgSw",
         "name": "Starter",
-        "price": 3999,
+        "price": 49,
         "rfp_limit": 10,
         "doc_limit": 50,
     },
     "growth": {
         "plan_id": "plan_RY41P3CLgQpHA6",
         "name": "Growth", 
-        "price": 7999,
+        "price": 99,
         "rfp_limit": 25,
         "doc_limit": 150,
     },
     "pro": {
         "plan_id": "plan_RY41dLUizZQvpP",
         "name": "Pro",
-        "price": 15999,
+        "price": 199,
         "rfp_limit": 100,
         "doc_limit": 500,
     },
@@ -30,5 +30,4 @@ SUBSCRIPTION_PLANS = {
 }
 
 def get_plan_config(tier: str):
-    """Get configuration for a subscription tier"""
     return SUBSCRIPTION_PLANS.get(tier, SUBSCRIPTION_PLANS["free"])
